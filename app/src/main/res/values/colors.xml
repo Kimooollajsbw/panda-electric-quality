@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="laser">#D91F2A</color>
+    <color name="ink">#15181D</color>
+    <color name="paper">#F9FAFB</color>
+    <color name="bar">#E6181A1E</color>
+</resources>

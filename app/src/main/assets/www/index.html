@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>معاينة بالمقاس الحقيقي</title>
+<style>
+@font-face{font-family:'Changa';font-style:normal;font-weight:500;font-display:swap;src:url(fonts/changa-arabic-500-normal.woff2) format('woff2');unicode-range:U+0600-06FF,U+0750-077F,U+0870-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FEFC}
+@font-face{font-family:'Changa';font-style:normal;font-weight:500;font-display:swap;src:url(fonts/changa-latin-500-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Changa';font-style:normal;font-weight:700;font-display:swap;src:url(fonts/changa-arabic-700-normal.woff2) format('woff2');unicode-range:U+0600-06FF,U+0750-077F,U+0870-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FEFC}
+@font-face{font-family:'Changa';font-style:normal;font-weight:700;font-display:swap;src:url(fonts/changa-latin-700-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'IBM Plex Sans Arabic';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2) format('woff2');unicode-range:U+0600-06FF,U+0750-077F,U+0870-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FEFC}
+@font-face{font-family:'IBM Plex Sans Arabic';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-arabic-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'IBM Plex Sans Arabic';font-style:normal;font-weight:500;font-display:swap;src:url(fonts/ibm-plex-sans-arabic-arabic-500-normal.woff2) format('woff2');unicode-range:U+0600-06FF,U+0750-077F,U+0870-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FEFC}
+@font-face{font-family:'IBM Plex Sans Arabic';font-style:normal;font-weight:500;font-display:swap;src:url(fonts/ibm-plex-sans-arabic-latin-500-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'IBM Plex Sans Arabic';font-style:normal;font-weight:600;font-display:swap;src:url(fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2) format('woff2');unicode-range:U+0600-06FF,U+0750-077F,U+0870-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FEFC}
+@font-face{font-family:'IBM Plex Sans Arabic';font-style:normal;font-weight:600;font-display:swap;src:url(fonts/ibm-plex-sans-arabic-latin-600-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+:root{
+  /* Layout: a viewfinder on top holding the photo, the tool tray under it (beside it on wide screens).
+     Laser-level red is the only loud colour; everything around it stays graphite. */
+  --bg:#e8eaed;
+  --surface:#f9fafb;
+  --ink:#15181d;
+  --muted:#56606b;
+  --line:#ccd2d9;
+  --laser:#d91f2a;
+  --on-laser:#ffffff;
+  --warn:#8a5300;
+  --thumb:#a3abb4;
+  --stage:#1a1d22;
+  --on-photo:#ffffff;
+  --photo-chip:rgba(15,17,20,.74);
+  --font-display:"Changa","IBM Plex Sans Arabic","Segoe UI",Tahoma,sans-serif;
+  --font-body:"IBM Plex Sans Arabic","Segoe UI",Tahoma,system-ui,sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1013; --surface:#181b20; --ink:#eef1f4; --muted:#9aa3ad; --line:#2b3038;
+    --laser:#ff4650; --on-laser:#19080a; --warn:#f0b45a; --thumb:#414850; --stage:#050607;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1013; --surface:#181b20; --ink:#eef1f4; --muted:#9aa3ad; --line:#2b3038;
+  --laser:#ff4650; --on-laser:#19080a; --warn:#f0b45a; --thumb:#414850; --stage:#050607;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;-webkit-text-size-adjust:100%;overflow-x:hidden}
+h1,h2{font-family:var(--font-display);margin:0;text-wrap:balance;line-height:1.25}
+p{margin:0}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;touch-action:manipulation}
+button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:2px solid var(--laser);outline-offset:2px}
+.vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip-path:inset(50%)}
+.vh:focus-visible + .btn{outline:2px solid var(--laser);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-rows:auto minmax(240px,1fr) auto;max-width:1240px;margin-inline:auto}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:6px 16px;padding:10px 16px;flex-wrap:wrap}
+.top h1{font-size:clamp(17px,4.6vw,20px);font-weight:700;flex:1 1 160px}
+.subrow{flex:1 0 100%;display:flex;align-items:center;gap:10px;min-width:0}
+.subrow p{color:var(--muted);font-size:12.5px;flex:1 1 auto;min-width:0}
+.logo{flex:0 0 auto;border:0;background:none;padding:0;height:30px;display:flex;align-items:center}
+.logo img{height:30px;max-width:120px;object-fit:contain;display:block}
+.seg{display:inline-flex;gap:2px;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--surface)}
+.seg button{border:0;background:none;padding:4px 14px;border-radius:999px;font-weight:600;min-height:36px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+
+.stage{position:relative;background:var(--stage);overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.stage-inner{position:absolute;transform-origin:0 0}
+.stage-inner > canvas,.stage-inner > svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.item{cursor:grab}
+.handle{cursor:move}
+.lz{stroke:var(--laser);fill:none}
+.lz-glow{stroke:var(--laser);stroke-opacity:.28;fill:none}
+.h-ring{fill:rgba(255,255,255,.2);stroke:var(--laser)}
+.h-dot{fill:var(--laser)}
+.sel-o{fill:none;stroke:var(--on-photo);stroke-opacity:.9}
+.sel-i{fill:none;stroke:var(--laser)}
+.badges{position:absolute;top:10px;inset-inline-start:10px;display:flex;gap:6px;flex-wrap:wrap;pointer-events:none;max-width:calc(100% - 72px)}
+.badge{background:var(--photo-chip);color:var(--on-photo);font-size:12px;font-weight:500;padding:3px 10px;border-radius:999px;font-variant-numeric:tabular-nums}
+.badge.demo{background:var(--laser);color:var(--on-laser);font-weight:600}
+.zoom{position:absolute;top:10px;inset-inline-end:10px;display:grid;gap:6px}
+.zoom button{width:40px;height:40px;border-radius:50%;border:0;background:var(--photo-chip);color:var(--on-photo);display:grid;place-items:center;padding:0}
+.zoom svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.live{position:absolute;bottom:12px;inset-inline-start:12px;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:6px 16px;border:0;border-radius:999px;background:var(--laser);color:var(--on-laser);font-weight:700;font-family:var(--font-display);font-size:15px;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+.live svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#loupe{position:absolute;width:132px;height:132px;border-radius:50%;border:2px solid var(--on-photo);box-shadow:0 6px 20px rgba(0,0,0,.5);pointer-events:none}
+
+.panel{background:var(--surface);border-top:1px solid var(--line);padding:10px 0 12px;display:grid;gap:10px;align-content:start;min-width:0}
+.panel{grid-template-columns:minmax(0,1fr)}
+.panel > *{min-width:0}
+.place{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;min-width:0}
+.place > *{min-width:0}
+.selbar{margin-inline:16px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);padding:8px 10px;display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.selbar > *{min-width:0}
+.selhead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.selinfo{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.selinfo b{font-family:var(--font-display);font-weight:700;font-size:15px}
+.selinfo span{color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums;margin-inline-start:6px}
+.tilt{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);flex:0 0 auto}
+.tilt input{width:76px;accent-color:var(--laser)}
+.tilt output{min-width:38px;text-align:center;font-variant-numeric:tabular-nums;direction:ltr}
+.selacts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:6px 10px;border-radius:var(--r);border:1px solid var(--line);background:var(--bg);font-weight:600;text-align:center;line-height:1.2;font-size:14px;cursor:pointer}
+.btn.sm{min-height:38px;font-size:13px;background:var(--surface);padding-inline:4px}
+.btn.primary{background:var(--laser);color:var(--on-laser);border-color:transparent}
+.btn.danger{color:var(--laser)}
+
+.trayhead{display:flex;align-items:center;gap:8px;padding-inline:16px}
+.cats{display:flex;gap:6px;overflow-x:auto;flex:1 1 auto;min-width:0;scrollbar-width:none;padding-block:2px}
+.cats::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:4px 12px;min-height:36px;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip[aria-pressed="true"]{border-color:var(--laser);color:var(--laser);font-weight:600}
+.qty{flex:0 0 auto;padding-inline:10px !important;background:var(--bg) !important}
+.qty span{font-variant-numeric:tabular-nums;background:var(--ink);color:var(--bg);border-radius:999px;min-width:22px;padding:0 6px;font-size:12px;line-height:20px}
+.linkbtn{flex:0 0 auto;border:0;background:none;color:var(--muted);font-size:12.5px;text-decoration:underline;padding:2px 0;min-height:28px}
+.tray{display:flex;gap:8px;overflow-x:auto;padding:4px 16px 6px;scrollbar-width:thin}
+.card{position:relative;flex:0 0 auto;width:108px}
+.cardmain{width:100%;height:100%;border:1px solid var(--line);background:var(--bg);border-radius:var(--r);padding:6px;display:grid;gap:2px;justify-items:center;align-content:start;text-align:center}
+.th{width:100%;height:46px;border-radius:6px;background:var(--thumb);display:grid;place-items:center;overflow:hidden}
+.th svg{width:100%;height:100%}
+.cardmain b{font-size:12.5px;font-weight:600;line-height:1.25}
+.dm{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.dm i,.boq i{font-style:normal;font-weight:600;color:var(--warn)}
+.card.add .cardmain{border-style:dashed}
+.plus{width:100%;height:46px;display:grid;place-items:center;font-family:var(--font-display);font-size:28px;line-height:1;color:var(--laser)}
+.x{position:absolute;top:-4px;inset-inline-end:-4px;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:var(--surface);padding:0;display:grid;place-items:center}
+.x svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+.cal{display:grid;gap:8px;padding-inline:16px}
+.cal h2{font-size:17px}
+.cal p{font-size:13.5px;max-width:65ch}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.calrow{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
+.calrow .field{flex:1 1 150px}
+.field{display:grid;gap:3px;font-size:12.5px;color:var(--muted)}
+.field input{min-height:44px;width:100%;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);padding:4px 10px;font-size:16px;font-variant-numeric:tabular-nums}
+.tip{color:var(--muted);font-size:12.5px}
+
+.actions{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px;padding-inline:16px}
+
+.scrim{position:fixed;inset:0;background:rgba(8,10,12,.5);display:flex;align-items:flex-end;justify-content:center;z-index:30}
+.sheet{background:var(--surface);width:min(520px,100%);border-radius:16px 16px 0 0;padding:16px 16px 20px;display:grid;gap:12px;max-height:92%;overflow:auto}
+.sheet h2{font-size:18px}
+.sheet p{font-size:13.5px;color:var(--muted)}
+.sheet .en{font-size:12.5px;color:var(--muted);text-align:start}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row.end{justify-content:flex-end}
+.row .grow{flex:1 1 auto}
+.row .note{font-size:12.5px;color:var(--muted);flex:1 1 160px}
+.err{color:var(--warn) !important;font-weight:600}
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.sw{border:1px solid var(--line);background:var(--bg);border-radius:var(--r);padding:6px;display:grid;gap:4px;justify-items:center;font-size:12px;line-height:1.3}
+.sw svg{width:100%;height:52px;background:var(--thumb);border-radius:6px}
+.sw[aria-pressed="true"]{border-color:var(--laser);color:var(--laser);font-weight:600}
+.boq{list-style:none;margin:0;padding:0;display:grid;gap:0;border-top:1px solid var(--line)}
+.boq li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.boq li b{font-family:var(--font-display);font-variant-numeric:tabular-nums}
+.boq small{display:block;color:var(--muted);font-size:12px}
+.boq .empty{display:block;color:var(--muted)}
+.brandprev{height:64px;border:1px dashed var(--line);border-radius:var(--r);display:grid;place-items:center;background:var(--bg);color:var(--muted);font-size:13px}
+.brandprev img{max-height:48px;max-width:80%;object-fit:contain}
+
+.toast{position:fixed;inset-inline:16px;bottom:16px;margin-inline:auto;width:fit-content;max-width:calc(100% - 32px);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:10px;font-size:13.5px;z-index:40;opacity:0;transform:translateY(8px);pointer-events:none}
+.toast.on{opacity:1;transform:none}
+@media (prefers-reduced-motion:no-preference){.toast{transition:opacity .2s,transform .2s}}
+
+@media (min-width:900px){
+  .app{grid-template-columns:minmax(0,1fr) 400px;grid-template-rows:auto minmax(0,1fr)}
+  .top{grid-column:1 / -1}
+  .panel{border-top:0;border-inline-start:1px solid var(--line);overflow-y:auto}
+  .tray{flex-wrap:wrap;overflow:visible}
+  .cats{flex-wrap:wrap;overflow:visible}
+  .scrim{align-items:center}
+  .sheet{border-radius:16px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>معاينة بالمقاس الحقيقي</h1>
+    <div class="seg" role="group" aria-label="نوع السطح">
+      <button type="button" id="surfCeiling" aria-pressed="true">سقف</button>
+      <button type="button" id="surfWall" aria-pressed="false">حيطة</button>
+    </div>
+    <div class="subrow">
+      <button type="button" class="logo" id="logoBtn" hidden aria-label="غيّر اللوجو"><img id="logoImg" alt="لوجو الشركة"></button>
+      <p>منتجات باندا بحجمها على حيطتك وسقفك</p>
+      <button type="button" class="linkbtn" id="logoAdd">ضيف اللوجو</button>
+    </div>
+  </header>
+
+  <main class="stage" id="stage" aria-label="الصورة والمنتجات عليها">
+    <div class="stage-inner" id="stageInner">
+      <canvas id="photo"></canvas>
+      <svg id="overlay" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+        <defs>
+          <filter id="fShadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1.5" stdDeviation="2.2" flood-color="#000" flood-opacity=".38"/></filter>
+          <radialGradient id="gGlow"><stop offset="0" stop-color="#fff6d8" stop-opacity=".55"/><stop offset="1" stop-color="#fff6d8" stop-opacity="0"/></radialGradient>
+          <radialGradient id="gLens"><stop offset="0" stop-color="#fffef6"/><stop offset=".7" stop-color="#ffeaa2"/><stop offset="1" stop-color="#e6c56a"/></radialGradient>
+          <radialGradient id="gDiff"><stop offset="0" stop-color="#fffdf4"/><stop offset="1" stop-color="#f2ead0"/></radialGradient>
+          <linearGradient id="gTrim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d7dbdf"/></linearGradient>
+          <linearGradient id="gPlate" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e6e9ec"/></linearGradient>
+          <linearGradient id="gBody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d444c"/><stop offset="1" stop-color="#22262c"/></linearGradient>
+          <linearGradient id="gSheen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".4"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".16"/></linearGradient>
+        </defs>
+        <g id="gItems"></g>
+        <g id="gScale" pointer-events="none"></g>
+        <g id="gAdorn" pointer-events="none"></g>
+        <g id="gCal"></g>
+      </svg>
+    </div>
+    <div class="badges"><span class="badge demo" id="demoTag">صورة تجريبية</span><span class="badge" id="refTag"></span></div>
+    <div class="zoom" role="group" aria-label="تكبير الصورة">
+      <button type="button" id="zIn" aria-label="كبّر"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button type="button" id="zOut" aria-label="صغّر"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+      <button type="button" id="zFit" aria-label="اعرض الصورة كلها"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    </div>
+    <canvas id="loupe" width="264" height="264" hidden></canvas>
+    <button type="button" class="live" id="btnLive" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3.5"/></svg>كاميرا لايف</button>
+  </main>
+
+  <section class="panel" aria-label="الأدوات">
+    <div class="place" id="placeUI">
+      <div class="selbar" id="selbar">
+        <div class="selhead">
+          <div class="selinfo"><b id="selName"></b><span id="selDims"></span></div>
+          <label class="tilt" for="tilt"><span>ميل</span><input type="range" id="tilt" min="-15" max="15" step="0.5" value="0"><output id="tiltOut" for="tilt">0°</output></label>
+        </div>
+        <div class="selacts">
+          <button type="button" class="btn sm" id="actRot">لف 90°</button>
+          <button type="button" class="btn sm" id="actDup">كرّر</button>
+          <button type="button" class="btn sm" id="actGrid">شبكة</button>
+          <button type="button" class="btn sm" id="actColor">اللون</button>
+          <button type="button" class="btn sm danger" id="actDel">امسح</button>
+        </div>
+      </div>
+      <div class="trayhead">
+        <div class="cats" id="cats" role="group" aria-label="أقسام الكتالوج"></div>
+        <button type="button" class="btn sm qty" id="btnQty">الكميات <span id="count">0</span></button>
+      </div>
+      <div class="tray" id="tray"></div>
+    </div>
+
+    <div class="cal" id="calUI" hidden>
+      <h2>ظبّط المقاس</h2>
+      <p>حط العلامتين على طرفين حاجة مقاسها معروف في الصورة، وبعدين اختار طولها.</p>
+      <div class="chips" id="refChips" role="group" aria-label="مراجع جاهزة">
+        <button type="button" class="chip" data-cm="29.7">طول ورقة A4 · 29.7</button>
+        <button type="button" class="chip" data-cm="8.56">كارت بنكي · 8.56</button>
+        <button type="button" class="chip" data-cm="60">بلاطة · 60</button>
+        <button type="button" class="chip" data-cm="90">عرض باب · 90</button>
+        <button type="button" class="chip" data-cm="100">متر · 100</button>
+      </div>
+      <div class="calrow">
+        <label class="field" for="refCm"><span>الطول بين العلامتين (سم)</span><input id="refCm" type="number" inputmode="decimal" min="1" max="2000" step="0.01"></label>
+        <button type="button" class="btn" id="calCancel">رجوع</button>
+        <button type="button" class="btn primary" id="calOk">تمام</button>
+      </div>
+      <p class="tip">للدقة: اقف قصاد السطح وصوّر على استقامة، وخلّي المرجع قريب من مكان التركيب.</p>
+    </div>
+
+    <div class="actions">
+      <input class="vh" type="file" id="fileCam" accept="image/*" capture="environment">
+      <label class="btn primary" for="fileCam">صوّر</label>
+      <input class="vh" type="file" id="filePick" accept="image/*">
+      <label class="btn" for="filePick">من الصور</label>
+      <button type="button" class="btn" id="btnCal">ظبّط المقاس</button>
+      <button type="button" class="btn" id="btnSave" hidden>احفظ الصورة</button>
+    </div>
+  </section>
+</div>
+
+<div class="scrim" id="sheetGrid" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="gridTitle">
+    <h2 id="gridTitle">وزّع شبكة</h2>
+    <p>القطع هتتوزع حوالين مكان القطعة المختارة، والمسافة محسوبة من المركز للمركز.</p>
+    <div class="grid2">
+      <label class="field" for="gCols"><span>عدد في الصف</span><input id="gCols" type="number" inputmode="numeric" min="1" max="12" value="3"></label>
+      <label class="field" for="gRows"><span>عدد الصفوف</span><input id="gRows" type="number" inputmode="numeric" min="1" max="12" value="2"></label>
+      <label class="field" for="gDx"><span>المسافة في الصف (سم)</span><input id="gDx" type="number" inputmode="decimal" min="1" max="1000" value="100"></label>
+      <label class="field" for="gDy"><span>المسافة بين الصفوف (سم)</span><input id="gDy" type="number" inputmode="decimal" min="1" max="1000" value="100"></label>
+    </div>
+    <div class="row end">
+      <button type="button" class="btn" data-close>إلغاء</button>
+      <button type="button" class="btn primary" id="gridOk">وزّع</button>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="sheetProd" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pTitle">
+    <h2 id="pTitle">منتج بمقاسك</h2>
+    <p class="en" id="pEn" dir="ltr" hidden></p>
+    <label class="field" for="pName" id="pNameField"><span>اسم المنتج</span><input id="pName" type="text" maxlength="40" placeholder="مثال: سبوت 7 وات"></label>
+    <div class="seg" id="pShapeSeg" role="group" aria-label="شكل المنتج" style="justify-self:start">
+      <button type="button" id="pRound" aria-pressed="true">دائري</button>
+      <button type="button" id="pRect" aria-pressed="false">مستطيل</button>
+    </div>
+    <div class="grid2">
+      <label class="field" for="pW"><span id="pWLabel">القطر (مم)</span><input id="pW" type="number" inputmode="decimal" min="5" max="5000"></label>
+      <label class="field" for="pH" id="pHField" hidden><span>الارتفاع (مم)</span><input id="pH" type="number" inputmode="decimal" min="5" max="5000"></label>
+    </div>
+    <div class="row">
+      <input class="vh" type="file" id="fileProd" accept="image/*">
+      <label class="btn" for="fileProd">صورة المنتج</label>
+      <button type="button" class="linkbtn" id="pImgDel" hidden>شيل الصورة</button>
+      <span class="note" id="pNote"></span>
+    </div>
+    <div class="row end">
+      <button type="button" class="btn danger" id="pDel" hidden>امسح المنتج</button>
+      <span class="grow"></span>
+      <button type="button" class="btn" data-close>إلغاء</button>
+      <button type="button" class="btn primary" id="pOk">احفظ</button>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="sheetColor" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="colTitle">
+    <h2 id="colTitle">لون الإطار × الحلقة</h2>
+    <div class="swatches" id="swatches"></div>
+    <div class="row end"><button type="button" class="btn" data-close>إقفال</button></div>
+  </div>
+</div>
+
+<div class="scrim" id="sheetQty" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="qtyTitle">
+    <h2 id="qtyTitle">قائمة الكميات</h2>
+    <ul class="boq" id="boq"></ul>
+    <p>أسماء المنتجات وألوانها من panda-electric.com. الموقع مش كاتب مقاسات، فأي مقاس عليه «تقريبي» محتاج قياس وتعديل من علامة القلم على المنتج.</p>
+    <div class="row end">
+      <button type="button" class="btn danger" id="qtyClear">امسح الكل</button>
+      <span class="grow"></span>
+      <button type="button" class="btn" data-close>إقفال</button>
+      <button type="button" class="btn primary" id="qtyCopy">انسخ القائمة</button>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="sheetBrand" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="brTitle">
+    <h2 id="brTitle">لوجو الشركة</h2>
+    <div class="brandprev" id="brandPrev"></div>
+    <p>اللوجو بيظهر فوق في التطبيق وعلى الصورة اللي بتحفظها.</p>
+    <div class="row end">
+      <button type="button" class="btn danger" id="brDel" hidden>شيل اللوجو</button>
+      <span class="grow"></span>
+      <button type="button" class="btn" data-close>إقفال</button>
+      <input class="vh" type="file" id="fileLogo" accept="image/*">
+      <label class="btn primary" for="fileLogo">اختار صورة اللوجو</label>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+const $=(s,r)=>(r||document).querySelector(s);
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const num=(v,d)=>String(parseFloat(Number(v).toFixed(d==null?1:d)));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeId=s=>String(s).replace(/[^A-Za-z0-9_-]/g,'_');
+
+/* ---------- scale maths ---------- */
+function pxPerMm(c){return Math.hypot(c.bx-c.ax,c.by-c.ay)/c.mm;}
+function fmtLen(mm){return mm>=1000?num(mm/1000,2)+' م':num(mm/10)+' سم';}
+function dimText(p){return p.shape==='round'?'Ø '+num(p.w/10)+' سم':num(p.w/10)+' × '+num(p.h/10)+' سم';}
+
+/* ---------- colour names as the Panda Electric site lists them ---------- */
+const TONE={White:['#f4f4f2','أبيض'],Black:['#1d1e21','أسود'],Champagne:['#cdb794','شامبين'],Beige:['#dccbb0','بيج'],Pearl:['#efe9df','لولي'],Gold:['#c9a449','دهبي'],Silver:['#c3c7cb','فضي'],Brown:['#6b4a33','بني'],'Shiny Silver':['#d3d7db','فضي لامع'],'Shiny Gold':['#d4af52','دهبي لامع']};
+const pair=(a,b)=>({en:a+' * '+b,ar:TONE[a][1]+' × '+TONE[b][1],c:[TONE[a][0],TONE[b][0]]});
+const one=a=>({en:a,ar:TONE[a][1],c:[TONE[a][0],TONE[a][0]]});
+const FRAME12=[['White','White'],['Black','Black'],['White','Black'],['Black','White'],['Champagne','Gold'],['White','Gold'],['Black','Gold'],['Silver','Silver'],['White','Silver'],['Black','Silver'],['Champagne','Silver'],['Beige','Gold']].map(x=>pair(x[0],x[1]));
+const ROUND_COLORS=FRAME12.concat([pair('Pearl','Gold')]);
+const HOLDER_COLORS=['White','Beige','Brown','Shiny Silver','Shiny Gold'].map(one);
+
+/* ---------- product artwork, drawn in millimetres around (0,0) ---------- */
+const A={
+  spotFrame(shape,d,col,anti){
+    const r=d/2,edge='stroke="#000" stroke-opacity=".28" stroke-width="'+d*.012+'"';
+    const body=shape==='square'
+      ?'<rect x="'+(-r)+'" y="'+(-r)+'" width="'+d+'" height="'+d+'" rx="'+d*.07+'" fill="'+col[0]+'" '+edge+' filter="url(#fShadow)"/><rect x="'+(-r)+'" y="'+(-r)+'" width="'+d+'" height="'+d+'" rx="'+d*.07+'" fill="url(#gSheen)"/>'
+      :'<circle r="'+r+'" fill="'+col[0]+'" '+edge+' filter="url(#fShadow)"/><circle r="'+r+'" fill="url(#gSheen)"/>';
+    const inner=anti
+      ?'<circle r="'+r*.74+'" fill="#0d0d0f"/><circle r="'+r*.58+'" fill="#1b1c1f"/><circle r="'+r*.3+'" fill="url(#gLens)"/>'
+      :'<circle r="'+r*.76+'" fill="'+col[1]+'" stroke="#000" stroke-opacity=".22" stroke-width="'+d*.008+'"/><circle r="'+r*.76+'" fill="url(#gSheen)"/><circle r="'+r*.64+'" fill="'+col[1]+'" stroke="#000" stroke-opacity=".2" stroke-width="'+d*.006+'"/><circle r="'+r*.54+'" fill="#26282c"/><circle r="'+r*.47+'" fill="url(#gLens)"/>';
+    return '<circle r="'+r*1.9+'" fill="url(#gGlow)"/>'+body+inner;
+  },
+  holder(d,col,flower){
+    const r=d/2;let o='<circle r="'+r+'" fill="'+col[0]+'" stroke="#000" stroke-opacity=".28" stroke-width="'+d*.012+'" filter="url(#fShadow)"/><circle r="'+r+'" fill="url(#gSheen)"/>';
+    if(flower){for(let i=0;i<8;i++){const a=i*Math.PI/4;o+='<circle cx="'+Math.cos(a)*r*.62+'" cy="'+Math.sin(a)*r*.62+'" r="'+r*.2+'" fill="#000" fill-opacity=".1"/>';}}
+    else o+='<circle r="'+r*.72+'" fill="none" stroke="#000" stroke-opacity=".16" stroke-width="'+d*.012+'"/>';
+    return o+'<circle r="'+r*.36+'" fill="#f1efe9" stroke="#000" stroke-opacity=".25" stroke-width="'+d*.01+'"/><circle r="'+r*.2+'" fill="#3a3b3e"/>';
+  },
+  bar(w,h,kind){
+    let o='<rect x="'+(-w/2)+'" y="'+(-h/2)+'" width="'+w+'" height="'+h+'" rx="'+Math.min(w,h)*.18+'" fill="url(#gBody)" stroke="#0c0d0f" stroke-width="'+Math.min(w,h)*.04+'" filter="url(#fShadow)"/>';
+    if(kind==='flood') o+='<rect x="'+(-w/2+h*.4)+'" y="'+(-h*.22)+'" width="'+(w-h*.8)+'" height="'+h*.44+'" rx="'+h*.22+'" fill="url(#gDiff)"/>';
+    if(kind==='spot') o+='<circle r="'+h*.75+'" fill="#17181b" stroke="#0c0d0f" stroke-width="'+h*.05+'"/><circle r="'+h*.44+'" fill="url(#gLens)"/>';
+    if(kind==='fold'){for(let i=0;i<8;i++) o+='<circle cx="'+(-w/2+w*(i+.5)/8)+'" r="'+h*.2+'" fill="url(#gLens)"/>';}
+    if(kind==='psu') o+='<rect x="'+(-w*.3)+'" y="'+(-h*.12)+'" width="'+w*.6+'" height="'+h*.24+'" rx="'+h*.12+'" fill="#111316"/><circle cx="'+w*.4+'" r="'+h*.13+'" fill="#6fd08a"/>';
+    return o;
+  },
+  ell(w,h,lit){
+    const t=Math.min(w,h)*.18,x=-w/2,y=-h/2;
+    let o='<path d="M'+x+' '+y+' h'+w+' v'+t+' h'+(-(w-t))+' v'+(h-t)+' h'+(-t)+' z" fill="url(#gBody)" stroke="#0c0d0f" stroke-width="'+t*.06+'" stroke-linejoin="round" filter="url(#fShadow)"/>';
+    if(lit) o+='<rect x="'+(x+t*1.3)+'" y="'+(y+t*.28)+'" width="'+(w-t*1.7)+'" height="'+t*.44+'" rx="'+t*.22+'" fill="url(#gDiff)"/><rect x="'+(x+t*.28)+'" y="'+(y+t*1.3)+'" width="'+t*.44+'" height="'+(h-t*1.7)+'" rx="'+t*.22+'" fill="url(#gDiff)"/>';
+    return o;
+  },
+  bell(w,h){
+    let o='<rect x="'+(-w/2)+'" y="'+(-h/2)+'" width="'+w+'" height="'+h+'" rx="'+Math.min(w,h)*.1+'" fill="url(#gPlate)" stroke="#b7bdc3" stroke-width="'+Math.min(w,h)*.01+'" filter="url(#fShadow)"/>';
+    for(let i=0;i<5;i++) o+='<rect x="'+(-w*.28)+'" y="'+(-h*.3+i*h*.1)+'" width="'+w*.56+'" height="'+h*.035+'" rx="'+h*.017+'" fill="#9aa1a8"/>';
+    return o+'<circle cy="'+h*.32+'" r="'+Math.min(w,h)*.05+'" fill="#c1c6cb"/>';
+  },
+  box(w,h){
+    const i=Math.min(w,h)*.1,l=Math.min(w,h)*.06;
+    return '<rect x="'+(-w/2)+'" y="'+(-h/2)+'" width="'+w+'" height="'+h+'" rx="'+i*.7+'" fill="#dfe4e8" stroke="#8f989f" stroke-width="'+i*.08+'" filter="url(#fShadow)"/><rect x="'+(-w/2+i)+'" y="'+(-h/2+i)+'" width="'+(w-2*i)+'" height="'+(h-2*i)+'" rx="'+i*.4+'" fill="#b9c1c8"/>'+
+      '<circle cx="'+(-w/2+i*.55)+'" r="'+l+'" fill="#8f989f"/><circle cx="'+(w/2-i*.55)+'" r="'+l+'" fill="#8f989f"/><circle r="'+Math.min(w,h)*.16+'" fill="none" stroke="#8f989f" stroke-width="'+i*.08+'" stroke-dasharray="'+i*.4+' '+i*.3+'"/>';
+  },
+  panelRound(d){const r=d/2;return '<circle r="'+r*1.6+'" fill="url(#gGlow)"/><circle r="'+r+'" fill="url(#gTrim)" stroke="#aeb4ba" stroke-width="'+d*.008+'" filter="url(#fShadow)"/><circle r="'+r*.88+'" fill="url(#gDiff)"/>';},
+  panelSquare(w,h){const i=Math.min(w,h)*.035;return '<circle r="'+Math.max(w,h)*.85+'" fill="url(#gGlow)"/><rect x="'+(-w/2)+'" y="'+(-h/2)+'" width="'+w+'" height="'+h+'" rx="'+Math.min(w,h)*.01+'" fill="url(#gTrim)" stroke="#aeb4ba" stroke-width="'+Math.min(w,h)*.004+'" filter="url(#fShadow)"/><rect x="'+(-w/2+i)+'" y="'+(-h/2+i)+'" width="'+(w-2*i)+'" height="'+(h-2*i)+'" fill="url(#gDiff)"/>';},
+  batten(w,h){const i=h*.16;return '<rect x="'+(-w/2)+'" y="'+(-h/2)+'" width="'+w+'" height="'+h+'" rx="'+h*.18+'" fill="url(#gTrim)" stroke="#aeb4ba" stroke-width="'+h*.02+'" filter="url(#fShadow)"/><rect x="'+(-w/2+h*.5)+'" y="'+(-h/2+i)+'" width="'+(w-h)+'" height="'+(h-2*i)+'" rx="'+(h-2*i)/2+'" fill="url(#gDiff)"/>';},
+  flood(w,h){const gx=w*.1,gy=h*.12;let d='';for(let r=0;r<4;r++)for(let c=0;c<6;c++){d+='<circle cx="'+(-w/2+gx+(w-2*gx)*(c+.5)/6)+'" cy="'+(-h/2+gy+(h-2*gy)*(r+.5)/4)+'" r="'+w*.022+'" fill="#ffe9a6"/>';}
+    return '<rect x="'+(-w/2)+'" y="'+(-h/2)+'" width="'+w+'" height="'+h+'" rx="'+w*.04+'" fill="url(#gBody)" stroke="#111418" stroke-width="'+w*.006+'" filter="url(#fShadow)"/><rect x="'+(-w/2+gx*.7)+'" y="'+(-h/2+gy*.7)+'" width="'+(w-gx*1.4)+'" height="'+(h-gy*1.4)+'" rx="'+w*.02+'" fill="#20252b" stroke="#596270" stroke-width="'+w*.006+'"/>'+d;},
+  plate(w,h,mods){const mw=22.5,mh=45;const n=mods.reduce((a,m)=>a+(m==='sock'?2:1),0);let x=-n*mw/2;
+    let o='<rect x="'+(-w/2)+'" y="'+(-h/2)+'" width="'+w+'" height="'+h+'" rx="7" fill="url(#gPlate)" stroke="#b7bdc3" stroke-width=".6" filter="url(#fShadow)"/><rect x="'+(-n*mw/2-1.5)+'" y="'+(-mh/2-1.5)+'" width="'+(n*mw+3)+'" height="'+(mh+3)+'" rx="2.5" fill="#dde1e5"/>';
+    for(const m of mods){
+      if(m==='sock'){const cx=x+mw;o+='<rect x="'+(x+.6)+'" y="'+(-mh/2)+'" width="'+(2*mw-1.2)+'" height="'+mh+'" rx="1.8" fill="#fbfbfb" stroke="#c4c9ce" stroke-width=".5"/><circle cx="'+cx+'" r="17" fill="#eaedf0" stroke="#c4c9ce" stroke-width=".6"/><circle cx="'+(cx-9.5)+'" r="2.4" fill="#3a4047"/><circle cx="'+(cx+9.5)+'" r="2.4" fill="#3a4047"/>';x+=2*mw;}
+      else{o+='<rect x="'+(x+.6)+'" y="'+(-mh/2)+'" width="'+(mw-1.2)+'" height="'+mh+'" rx="1.8" fill="#fbfbfb" stroke="#c4c9ce" stroke-width=".5"/><rect x="'+(x+mw/2-1.2)+'" y="'+(-mh/2+5)+'" width="2.4" height="6" rx="1.2" fill="#c1c6cb"/>';x+=mw;}
+    }
+    return o;},
+  genericRound(w,h){const m=Math.max(w,h);return '<ellipse rx="'+w/2+'" ry="'+h/2+'" fill="url(#gTrim)" stroke="#8d949b" stroke-width="'+m*.012+'" filter="url(#fShadow)"/><ellipse rx="'+w*.3+'" ry="'+h*.3+'" fill="none" stroke="#aeb4ba" stroke-width="'+m*.01+'"/>';},
+  genericRect(w,h){return '<rect x="'+(-w/2)+'" y="'+(-h/2)+'" width="'+w+'" height="'+h+'" rx="'+Math.min(w,h)*.06+'" fill="url(#gPlate)" stroke="#8d949b" stroke-width="'+Math.max(w,h)*.008+'" filter="url(#fShadow)"/>';}
+};
+function imgArt(p){
+  const id='cp-'+safeId(p.id);
+  const clip=p.shape==='round'?'<ellipse rx="'+p.w/2+'" ry="'+p.h/2+'"/>':'<rect x="'+(-p.w/2)+'" y="'+(-p.h/2)+'" width="'+p.w+'" height="'+p.h+'" rx="'+Math.min(p.w,p.h)*.05+'"/>';
+  return '<clipPath id="'+id+'">'+clip+'</clipPath><image href="'+p.img+'" x="'+(-p.w/2)+'" y="'+(-p.h/2)+'" width="'+p.w+'" height="'+p.h+'" preserveAspectRatio="xMidYMid slice" clip-path="url(#'+id+')"/>';
+}
+function artFor(p,ci){
+  if(p.img) return imgArt(p);
+  if(!p.draw) return p.shape==='round'?A.genericRound(p.w,p.h):A.genericRect(p.w,p.h);
+  return p.draw(p,p.colors?(p.colors[ci||0]||p.colors[0]):null);
+}
+
+/* ---------- catalogue ----------
+   Names, categories and colours of the Panda items come from panda-electric.com.
+   That site lists no dimensions, so every size here is a typical one, flagged approximate
+   until someone measures the product and saves the real size. */
+const CATS=[{id:'spot',name:'سبوت'},{id:'panel',name:'بانل'},{id:'track',name:'ماجنتك تراك'},{id:'holder',name:'دوايات'},{id:'wallbox',name:'ماجيك وأجراس'},{id:'generic',name:'عام'},{id:'mine',name:'منتجاتي'}];
+const BASE_LIST=[
+  {id:'sp-round',cat:'spot',name:'سبوت مدور',en:'MR16 / GU5.3 Swivel Frame, Round Model',w:90,h:90,shape:'round',colors:ROUND_COLORS,draw:(p,c)=>A.spotFrame('round',p.w,c.c)},
+  {id:'sp-square',cat:'spot',name:'سبوت مربع',en:'MR16 / GU5.3 Swivel Frame, Square Model',w:90,h:90,shape:'rect',colors:FRAME12,draw:(p,c)=>A.spotFrame('square',Math.min(p.w,p.h),c.c)},
+  {id:'sp-anti',cat:'spot',name:'سبوت مانع للتوهج',en:'MR16 / GU5.3 Swivel Frame, Round Anti Glare Ring',w:90,h:90,shape:'round',colors:[pair('Black','Black')],draw:(p,c)=>A.spotFrame('round',p.w,c.c,true)},
+  {id:'pn-smd26',cat:'panel',name:'بانل SMD مدور 26 وات',en:'Led Panel SMD 26W Round',w:300,h:300,shape:'round',draw:p=>A.panelRound(p.w)},
+  {id:'tr-spot',cat:'track',name:'سبوت تراك',en:'Track Spotlight',w:110,h:24,shape:'rect',draw:p=>A.bar(p.w,p.h,'spot')},
+  {id:'tr-rflood',cat:'track',name:'فلود تراك مدور',en:'Round Track Floodlight',w:300,h:24,shape:'rect',draw:p=>A.bar(p.w,p.h,'flood')},
+  {id:'tr-rspot',cat:'track',name:'سبوت فلود مدور',en:'Round Spot Floodlight',w:110,h:24,shape:'rect',draw:p=>A.bar(p.w,p.h,'spot')},
+  {id:'tr-rfold',cat:'track',name:'سبوت تراك قابل للطي',en:'Round Track Folding Spot Light',w:220,h:24,shape:'rect',draw:p=>A.bar(p.w,p.h,'fold')},
+  {id:'tr-lflood',cat:'track',name:'فلود حرف L',en:'L-type Floodlights',w:150,h:150,shape:'rect',draw:p=>A.ell(p.w,p.h,true)},
+  {id:'tr-corner',cat:'track',name:'وصلة ركن للتراك',en:'Corner Conductive Module',w:100,h:100,shape:'rect',draw:p=>A.ell(p.w,p.h,false)},
+  {id:'tr-psu',cat:'track',name:'ترانس داخلي للتراك',en:'Track Built-in Power Supply Mate',w:300,h:24,shape:'rect',draw:p=>A.bar(p.w,p.h,'psu')},
+  {id:'lh-plain',cat:'holder',name:'دواية ديكور سادة',en:'Plain Lamp Holder',w:105,h:105,shape:'round',colors:HOLDER_COLORS,draw:(p,c)=>A.holder(p.w,c.c,false)},
+  {id:'lh-flower',cat:'holder',name:'دواية ديكور وردة',en:'Decorative Lamp Holder Flowry "Shiny * Shiny"',w:120,h:120,shape:'round',draw:p=>A.holder(p.w,[TONE['Shiny Silver'][0]],true)},
+  {id:'lh-saqqara',cat:'holder',name:'دواية ديكور سقارة',en:'',w:110,h:110,shape:'round',draw:p=>A.holder(p.w,[TONE.White[0]],false)},
+  {id:'mb-box',cat:'wallbox',name:'علبة ماجيك',en:'Magic Box',w:105,h:70,shape:'rect',draw:p=>A.box(p.w,p.h)},
+  {id:'mb-pro',cat:'wallbox',name:'ماجيك برو',en:'Magic Pro',w:105,h:70,shape:'rect',draw:p=>A.box(p.w,p.h)},
+  {id:'db-bird',cat:'wallbox',name:'جرس عصفور',en:'Bird Sound Bell',w:130,h:90,shape:'rect',draw:p=>A.bell(p.w,p.h)},
+  {id:'db-ding',cat:'wallbox',name:'جرس دينج دونج',en:'Ding Dong Bell',w:160,h:110,shape:'rect',draw:p=>A.bell(p.w,p.h)},
+  {id:'g-sw3',cat:'generic',name:'مفتاح 3 موديول',en:'',w:120,h:80,shape:'rect',draw:p=>A.plate(p.w,p.h,['sw','sw','sw'])},
+  {id:'g-sock3',cat:'generic',name:'بريزة ومفتاح',en:'',w:120,h:80,shape:'rect',draw:p=>A.plate(p.w,p.h,['sock','sw'])},
+  {id:'g-sw4',cat:'generic',name:'لوحة 4 موديول',en:'',w:142,h:80,shape:'rect',draw:p=>A.plate(p.w,p.h,['sw','sw','sw','sw'])},
+  {id:'g-sw7',cat:'generic',name:'لوحة 7 موديول',en:'',w:210,h:80,shape:'rect',draw:p=>A.plate(p.w,p.h,['sw','sw','sw','sock','sw','sw'])},
+  {id:'g-panel60',cat:'generic',name:'بانل 60×60',en:'',w:595,h:595,shape:'rect',draw:p=>A.panelSquare(p.w,p.h)},
+  {id:'g-batten',cat:'generic',name:'كشاف خطي 120 سم',en:'',w:1200,h:75,shape:'rect',draw:p=>A.batten(p.w,p.h)},
+  {id:'g-flood',cat:'generic',name:'كشاف فلود 50 وات',en:'',w:215,h:170,shape:'rect',draw:p=>A.flood(p.w,p.h)}
+];
+const BASE={};for(const b of BASE_LIST){b.approx=true;BASE[b.id]=b;}
+
+/* ---------- elements ---------- */
+const stage=$('#stage'),inner=$('#stageInner'),photo=$('#photo'),pctx=photo.getContext('2d');
+const overlay=$('#overlay'),gItems=$('#gItems'),gScale=$('#gScale'),gAdorn=$('#gAdorn'),gCal=$('#gCal');
+const loupe=$('#loupe'),lctx=loupe.getContext('2d');
+const tray=$('#tray'),catsEl=$('#cats'),selbar=$('#selbar'),selName=$('#selName'),selDims=$('#selDims'),tilt=$('#tilt'),tiltOut=$('#tiltOut');
+const actRot=$('#actRot'),actDup=$('#actDup'),actGrid=$('#actGrid'),actColor=$('#actColor'),actDel=$('#actDel');
+const placeUI=$('#placeUI'),calUI=$('#calUI'),refCm=$('#refCm'),refChips=$('#refChips'),calOk=$('#calOk'),calCancel=$('#calCancel');
+const demoTag=$('#demoTag'),refTag=$('#refTag'),countEl=$('#count'),btnCal=$('#btnCal'),btnSave=$('#btnSave'),toastEl=$('#toast');
+const sheetGrid=$('#sheetGrid'),sheetProd=$('#sheetProd'),sheetColor=$('#sheetColor'),sheetQty=$('#sheetQty'),sheetBrand=$('#sheetBrand');
+const SHEETS=[sheetGrid,sheetProd,sheetColor,sheetQty,sheetBrand];
+
+/* ---------- state ---------- */
+let uid=1,downloads=null,db=null,dbFresh=false,dbTimer=0,logoEl=null;
+const state={surface:'ceiling',cat:'spot',demo:true,W:1,H:1,cal:{ax:0,ay:0,bx:1,by:0,mm:1},calibrated:false,items:[],sel:null,mode:'place',
+  view:{z:1,tx:0,ty:0},fit:{f:1,left:0,top:0,cw:1,ch:1},guides:null,calBackup:null,lastCm:29.7,lastColor:{'sp-round':5}};
+const k=()=>pxPerMm(state.cal);
+const sscale=()=>state.fit.f*state.view.z;
+const selItem=()=>state.items.find(i=>i.id===state.sel)||null;
+
+/* ---------- saved sizes, own products and logo (shared store when available, this device otherwise) ---------- */
+const LS='realsize.store.v2';
+const IMG_OK=/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+const okImg=v=>typeof v==='string'&&v.length<240000&&IMG_OK.test(v)?v:null;
+const store={ov:{},custom:[],logo:null};
+function cleanOv(v){return v&&+v.w>0&&+v.h>0?{w:clamp(+v.w,5,5000),h:clamp(+v.h,5,5000),img:okImg(v.img)}:null;}
+function cleanCustom(id,v){
+  if(!v||!(+v.w>0)||!(+v.h>0)||!id) return null;
+  return {id:String(id),custom:true,cat:'mine',name:String(v.name||'منتج').slice(0,40),en:'',w:clamp(+v.w,5,5000),h:clamp(+v.h,5,5000),shape:v.shape==='round'?'round':'rect',img:okImg(v.img),approx:false};
+}
+function loadLocal(){
+  try{
+    const j=JSON.parse(localStorage.getItem(LS)||'{}')||{},ov={};
+    for(const id in (j.ov||{})){const o=cleanOv(j.ov[id]);if(o&&BASE[id]) ov[id]=o;}
+    store.ov=ov;
+    store.custom=(Array.isArray(j.custom)?j.custom:[]).map(c=>cleanCustom(c&&safeId(c.id),c)).filter(Boolean);
+    store.logo=okImg(j.logo);
+  }catch(e){}
+}
+function saveLocal(){
+  try{localStorage.setItem(LS,JSON.stringify({ov:store.ov,custom:store.custom.map(p=>({id:p.id,name:p.name,w:p.w,h:p.h,shape:p.shape,img:p.img})),logo:store.logo}));}catch(e){}
+}
+function saveFail(e){
+  const c=e&&e.code;
+  toast(c==='invalid_argument'?'مش مسموح لك تعدّل الكتالوج المشترك.':c==='quota_exceeded'?'مساحة الحفظ اتملت. امسح منتجات أو صور.':'الحفظ ما تمّش. جرّب تاني.');
+  return false;
+}
+async function putOverride(id,v){
+  if(db){try{await db.collection('overrides').doc(id).set(v);return true;}catch(e){return saveFail(e);}}
+  store.ov[id]=cleanOv(v);saveLocal();catalogChanged();return true;
+}
+async function dropOverride(id){
+  if(db){try{await db.collection('overrides').doc(id).delete();return true;}catch(e){return saveFail(e);}}
+  delete store.ov[id];saveLocal();catalogChanged();return true;
+}
+async function putCustom(id,v){
+  if(db){try{await db.collection('custom').doc(id).set(v);return true;}catch(e){return saveFail(e);}}
+  const c=cleanCustom(id,v),i=store.custom.findIndex(p=>p.id===id);
+  if(i>=0) store.custom[i]=c;else store.custom.push(c);
+  saveLocal();catalogChanged();return true;
+}
+async function dropCustom(id){
+  if(db){try{await db.collection('custom').doc(id).delete();return true;}catch(e){return saveFail(e);}}
+  store.custom=store.custom.filter(p=>p.id!==id);saveLocal();catalogChanged();return true;
+}
+async function putLogo(v){
+  if(db){try{await db.doc('settings/brand').set({logo:v});return true;}catch(e){return saveFail(e);}}
+  store.logo=v;saveLocal();logoChanged();return true;
+}
+function prod(id){
+  const b=BASE[id];
+  if(b){const o=store.ov[id];return o?Object.assign({},b,{w:o.w,h:b.shape==='round'?o.w:o.h,img:o.img,approx:false}):b;}
+  return store.custom.find(p=>p.id===id)||null;
+}
+function colorOf(p,it){return p.colors&&!p.img?(p.colors[it.color||0]||p.colors[0]):null;}
+function catalogChanged(){
+  state.items=state.items.filter(i=>prod(i.pid));
+  if(!selItem()) state.sel=null;
+  renderTray();renderItems();renderSelbar();renderAdorn();
+}
+function logoChanged(){
+  const v=store.logo;logoEl=null;
+  $('#logoBtn').hidden=!v;$('#logoAdd').hidden=!!v;
+  if(v){$('#logoImg').src=v;const im=new Image();im.onload=()=>{logoEl=im;};im.src=v;}
+  $('#brandPrev').innerHTML=v?'<img src="'+v+'" alt="اللوجو الحالي">':'لسه مفيش لوجو';
+  $('#brDel').hidden=!v;
+}
+
+/* ---------- demo scenes (0.4 px per mm) ---------- */
+function rng(seed){return()=>(seed=(seed*1664525+1013904223)>>>0)/4294967296;}
+function speckle(c,W,H){const r=rng(7);for(let i=0;i<6000;i++){c.fillStyle='rgba('+(r()<.5?'0,0,0,':'255,255,255,')+(.05*r()).toFixed(3)+')';c.fillRect(r()*W,r()*H,2,2);}}
+function vignette(c,W,H){const g=c.createRadialGradient(W/2,H/2,Math.min(W,H)*.35,W/2,H/2,Math.max(W,H)*.75);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,.3)');c.fillStyle=g;c.fillRect(0,0,W,H);}
+function drawCeiling(c,W,H){
+  let g=c.createLinearGradient(0,0,W,H);g.addColorStop(0,'#e9e7e2');g.addColorStop(1,'#d2cfc8');c.fillStyle=g;c.fillRect(0,0,W,H);
+  const m=140;
+  c.fillStyle='rgba(0,0,0,.16)';c.fillRect(m-12,m-12,W-2*m+24,H-2*m+24);
+  g=c.createLinearGradient(0,m,W,H-m);g.addColorStop(0,'#f5f4f1');g.addColorStop(1,'#e2e0da');c.fillStyle=g;c.fillRect(m,m,W-2*m,H-2*m);
+  const dx=1190,dy=170,ds=240;
+  c.fillStyle='rgba(0,0,0,.14)';c.fillRect(dx-3,dy-1,ds+6,ds+8);
+  c.fillStyle='#f8f8f6';c.fillRect(dx,dy,ds,ds);
+  c.strokeStyle='#b4b1ab';c.lineWidth=3;
+  for(let i=0;i<5;i++){const o=i*23+2;c.strokeRect(dx+o,dy+o,ds-2*o,ds-2*o);}
+  speckle(c,W,H);vignette(c,W,H);
+}
+function drawWall(c,W,H){
+  const fy=1100;
+  let g=c.createLinearGradient(0,0,W,fy);g.addColorStop(0,'#d9d3c8');g.addColorStop(1,'#c7c0b3');c.fillStyle=g;c.fillRect(0,0,W,fy);
+  g=c.createRadialGradient(420,300,40,420,300,900);g.addColorStop(0,'rgba(255,250,235,.38)');g.addColorStop(1,'rgba(255,250,235,0)');c.fillStyle=g;c.fillRect(0,0,W,fy);
+  c.fillStyle='#ece8e0';c.fillRect(0,0,W,34);c.fillStyle='rgba(0,0,0,.14)';c.fillRect(0,34,W,4);
+  g=c.createLinearGradient(0,fy,0,H);g.addColorStop(0,'#8c8377');g.addColorStop(1,'#6c645a');c.fillStyle=g;c.fillRect(0,fy,W,H-fy);
+  c.fillStyle='#efece6';c.fillRect(0,fy-40,W,40);c.fillStyle='rgba(0,0,0,.16)';c.fillRect(0,fy-42,W,2);
+  const x0=1000,dw=360,dh=840,y0=fy-dh;
+  c.fillStyle='rgba(0,0,0,.16)';c.fillRect(x0-32,y0-32,dw+64,dh+32);
+  c.fillStyle='#ebe7df';c.fillRect(x0-28,y0-28,dw+56,dh+28);
+  g=c.createLinearGradient(x0,0,x0+dw,0);g.addColorStop(0,'#8a6647');g.addColorStop(.5,'#9b7554');g.addColorStop(1,'#7d5b3f');c.fillStyle=g;c.fillRect(x0,y0,dw,dh);
+  c.strokeStyle='rgba(0,0,0,.24)';c.lineWidth=3;c.strokeRect(x0+40,y0+50,dw-80,330);c.strokeRect(x0+40,y0+430,dw-80,350);
+  c.fillStyle='#cfcfca';c.fillRect(x0+24,fy-420,62,10);c.beginPath();c.arc(x0+32,fy-415,11,0,Math.PI*2);c.fill();
+  speckle(c,W,H);vignette(c,W,H);
+}
+function setCanvas(W,H){state.W=W;state.H=H;photo.width=W;photo.height=H;overlay.setAttribute('viewBox','0 0 '+W+' '+H);}
+function loadDemo(sf){
+  state.demo=true;state.calBackup=null;state.view={z:1,tx:0,ty:0};state.items=[];
+  if(sf==='ceiling'){
+    setCanvas(1600,1100);drawCeiling(pctx,1600,1100);
+    state.cal={ax:1190,ay:410,bx:1430,by:410,mm:600};
+    for(const y of [380,780]) for(const x of [300,700,1100]) state.items.push({id:uid++,pid:'sp-round',color:5,x:x,y:y,rot:0,tilt:0,gid:'demo'});
+    state.sel=state.items[1].id;
+  }else{
+    setCanvas(1600,1180);drawWall(pctx,1600,1180);
+    state.cal={ax:1000,ay:560,bx:1360,by:560,mm:900};
+    state.items.push({id:uid++,pid:'g-sw3',color:0,x:892,y:600,rot:0,tilt:0,gid:null},{id:uid++,pid:'g-sock3',color:0,x:360,y:940,rot:0,tilt:0,gid:null});
+    state.sel=state.items[0].id;
+  }
+  state.calibrated=true;setMode('place');
+}
+
+/* ---------- photo ---------- */
+const loadImg=src=>new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>rej(new Error('image'));im.src=src;});
+async function loadPhoto(file){
+  if(!file) return;
+  const url=URL.createObjectURL(file);
+  try{
+    const im=await loadImg(url);
+    const f=Math.min(1,2000/Math.max(im.naturalWidth,im.naturalHeight));
+    setCanvas(Math.max(1,Math.round(im.naturalWidth*f)),Math.max(1,Math.round(im.naturalHeight*f)));
+    pctx.drawImage(im,0,0,state.W,state.H);
+    state.demo=false;state.items=[];state.sel=null;state.calibrated=false;state.calBackup=null;
+    state.cal={ax:state.W*.3,ay:state.H*.5,bx:state.W*.7,by:state.H*.5,mm:state.lastCm*10};
+    state.view={z:1,tx:0,ty:0};
+    setMode('cal');
+  }catch(e){toast('الصورة ما اتفتحتش. جرّب صورة JPG أو PNG.');}
+  finally{URL.revokeObjectURL(url);}
+}
+async function shrinkImage(file,max){
+  const url=URL.createObjectURL(file);
+  try{
+    const im=await loadImg(url),s=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');
+    c.width=Math.max(1,Math.round(im.naturalWidth*s));c.height=Math.max(1,Math.round(im.naturalHeight*s));
+    c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+    let d=c.toDataURL('image/webp',.86);
+    if(!IMG_OK.test(d)) d=c.toDataURL('image/png');
+    return okImg(d)?{data:d,ar:c.height/c.width}:null;
+  }catch(e){return null;}
+  finally{URL.revokeObjectURL(url);}
+}
+
+/* ---------- view (fit, zoom, pan) ---------- */
+function layout(){
+  const cw=stage.clientWidth,ch=stage.clientHeight;if(!cw||!ch) return;
+  const f=Math.min(cw/state.W,ch/state.H);
+  state.fit={f:f,left:(cw-state.W*f)/2,top:(ch-state.H*f)/2,cw:cw,ch:ch};
+  inner.style.width=state.W*f+'px';inner.style.height=state.H*f+'px';
+  inner.style.left=state.fit.left+'px';inner.style.top=state.fit.top+'px';
+  clampView();applyView();
+}
+function clampView(){
+  const F=state.fit,v=state.view;v.z=clamp(v.z,1,8);
+  const w=state.W*F.f*v.z,h=state.H*F.f*v.z;
+  v.tx=w<=F.cw?(F.cw-w)/2-F.left:clamp(v.tx,F.cw-F.left-w,-F.left);
+  v.ty=h<=F.ch?(F.ch-h)/2-F.top:clamp(v.ty,F.ch-F.top-h,-F.top);
+}
+function setTransform(){const v=state.view;inner.style.transform='translate('+v.tx+'px,'+v.ty+'px) scale('+v.z+')';}
+function applyView(){setTransform();renderItems();renderScale();renderAdorn();renderCal();}
+function zoomAt(px,py,z2){
+  const v=state.view,F=state.fit;z2=clamp(z2,1,8);
+  const ux=(px-F.left-v.tx)/v.z,uy=(py-F.top-v.ty)/v.z;
+  v.tx=px-F.left-ux*z2;v.ty=py-F.top-uy*z2;v.z=z2;clampView();applyView();
+}
+function toImg(cx,cy){const r=inner.getBoundingClientRect();return{x:(cx-r.left)/r.width*state.W,y:(cy-r.top)/r.height*state.H};}
+
+/* ---------- rendering ---------- */
+function itemTransform(it){return 'translate('+it.x+' '+it.y+')';}
+function itemMarkup(it){
+  const p=prod(it.pid);if(!p) return '';
+  const kk=k(),s=sscale(),a=it.rot+it.tilt,hw=Math.max(p.w*kk,44/s),hh=Math.max(p.h*kk,44/s);
+  return '<g class="item" data-id="'+it.id+'" transform="'+itemTransform(it)+'"><g transform="rotate('+a+') scale('+kk+')">'+artFor(p,it.color)+'</g><rect x="'+(-hw/2)+'" y="'+(-hh/2)+'" width="'+hw+'" height="'+hh+'" transform="rotate('+a+')" fill="#000" fill-opacity="0" pointer-events="all"/></g>';
+}
+function renderItems(){
+  gItems.innerHTML=state.items.map(itemMarkup).join('');
+  countEl.textContent=state.items.length;
+}
+function moveItems(){
+  for(const el of gItems.children){const it=state.items.find(i=>i.id==el.dataset.id);if(it) el.setAttribute('transform',itemTransform(it));}
+}
+function label(x,y,t,s){
+  const fs=13/s;
+  return '<text x="'+x+'" y="'+y+'" font-size="'+fs+'" font-family="Changa, Tahoma, sans-serif" font-weight="700" text-anchor="middle" direction="rtl" fill="#fff" stroke="#15181d" stroke-opacity=".85" stroke-width="'+fs*.28+'" stroke-linejoin="round" paint-order="stroke" pointer-events="none">'+t+'</text>';
+}
+function laser(x1,y1,x2,y2,s){
+  const c='x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'"';
+  return '<line class="lz-glow" '+c+' stroke-width="'+6/s+'"/><line class="lz" '+c+' stroke-width="'+1.5/s+'"/>';
+}
+function renderScale(){
+  if(!state.calibrated){gScale.innerHTML='';return;}
+  const kk=k(),W=state.W,H=state.H;let L=10;
+  for(const n of [10,20,50,100,200,500,1000,2000,5000,10000]){if(n*kk<=W*.3) L=n;}
+  const len=L*kk,x=W*.035,y=H-W*.035,t=Math.max(6,W*.008),fs=Math.max(14,W*.028);let segs='';
+  for(let i=0;i<5;i++) segs+='<rect x="'+(x+i*len/5)+'" y="'+(y-t)+'" width="'+len/5+'" height="'+t+'" fill="'+(i%2?'#ffffff':'#15181d')+'"/>';
+  gScale.innerHTML='<rect x="'+(x-2)+'" y="'+(y-t-2)+'" width="'+(len+4)+'" height="'+(t+4)+'" fill="#ffffff"/>'+segs+
+    '<text x="'+(x+len/2)+'" y="'+(y-t-fs*.45)+'" font-size="'+fs+'" font-family="Changa, Tahoma, sans-serif" font-weight="700" text-anchor="middle" direction="rtl" fill="#fff" stroke="#15181d" stroke-opacity=".85" stroke-width="'+fs*.24+'" stroke-linejoin="round" paint-order="stroke">'+fmtLen(L)+'</text>';
+}
+function renderAdorn(){
+  const s=sscale();let o='';const g=state.guides;
+  if(g){if(g.x!=null) o+=laser(g.x,0,g.x,state.H,s);if(g.y!=null) o+=laser(0,g.y,state.W,g.y,s);}
+  const it=selItem(),p=it&&prod(it.pid);
+  if(p&&state.mode==='place'){
+    const kk=k(),deg=it.rot+it.tilt,a=deg*Math.PI/180,w=p.w*kk,h=p.h*kk,pad=6/s;
+    const box='x="'+(-w/2-pad)+'" y="'+(-h/2-pad)+'" width="'+(w+2*pad)+'" height="'+(h+2*pad)+'" rx="'+4/s+'"';
+    o+='<g transform="translate('+it.x+' '+it.y+') rotate('+deg+')"><rect class="sel-o" '+box+' stroke-width="'+3.5/s+'"/><rect class="sel-i" '+box+' stroke-width="'+1.6/s+'" stroke-dasharray="'+6/s+' '+4/s+'"/></g>';
+    let best=null,bd=Infinity;
+    for(const q of state.items){if(q===it) continue;const d=Math.hypot(q.x-it.x,q.y-it.y);if(d<bd){bd=d;best=q;}}
+    if(best){
+      const c='x1="'+it.x+'" y1="'+it.y+'" x2="'+best.x+'" y2="'+best.y+'"';
+      o+='<line '+c+' stroke="#15181d" stroke-opacity=".7" stroke-width="'+4/s+'"/><line '+c+' stroke="#fff" stroke-width="'+1.5/s+'" stroke-dasharray="'+6/s+' '+4/s+'"/>';
+      o+=label((it.x+best.x)/2,(it.y+best.y)/2-8/s,fmtLen(bd/kk),s);
+    }
+    const hy=(Math.abs(w*Math.sin(a))+Math.abs(h*Math.cos(a)))/2;
+    o+=label(it.x,it.y-hy-pad-8/s,dimText(p),s);
+  }
+  gAdorn.innerHTML=o;
+}
+function handle(id,x,y,s){
+  const r=15/s;
+  return '<g class="handle" data-h="'+id+'" transform="translate('+x+' '+y+')"><circle r="'+30/s+'" fill="#000" fill-opacity="0" pointer-events="all"/><circle class="h-ring" r="'+r+'" stroke-width="'+2/s+'"/><line class="lz" x1="'+(-r*1.6)+'" y1="0" x2="'+(r*1.6)+'" y2="0" stroke-width="'+1.2/s+'"/><line class="lz" x1="0" y1="'+(-r*1.6)+'" x2="0" y2="'+(r*1.6)+'" stroke-width="'+1.2/s+'"/><circle class="h-dot" r="'+2.4/s+'"/></g>';
+}
+function renderCal(){
+  if(state.mode!=='cal'){gCal.innerHTML='';return;}
+  const c=state.cal,s=sscale();
+  gCal.innerHTML=laser(c.ax,c.ay,c.bx,c.by,s)+handle('a',c.ax,c.ay,s)+handle('b',c.bx,c.by,s)+label((c.ax+c.bx)/2,(c.ay+c.by)/2-22/s,num(c.mm/10,2)+' سم',s);
+}
+function thumbBox(p){const pad=Math.max(p.w,p.h)*.12;return (-p.w/2-pad)+' '+(-p.h/2-pad)+' '+(p.w+2*pad)+' '+(p.h+2*pad);}
+function thumb(p,ci){return '<svg viewBox="'+thumbBox(p)+'" aria-hidden="true">'+artFor(p,ci)+'</svg>';}
+const PENCIL='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>';
+function renderCats(){
+  catsEl.innerHTML=CATS.map(c=>'<button type="button" class="chip" data-cat="'+c.id+'" aria-pressed="'+(c.id===state.cat)+'">'+c.name+'</button>').join('');
+}
+function renderTray(){
+  const list=state.cat==='mine'?store.custom:BASE_LIST.filter(b=>b.cat===state.cat).map(b=>prod(b.id));
+  tray.innerHTML=list.map(p=>'<div class="card"><button type="button" class="cardmain" data-pid="'+esc(p.id)+'"><span class="th">'+thumb(p,state.lastColor[p.id]||0)+'</span><b>'+esc(p.name)+'</b><span class="dm">'+dimText(p)+(p.approx?' <i>تقريبي</i>':'')+'</span></button>'+
+    '<button type="button" class="x" data-edit="'+esc(p.id)+'" aria-label="عدّل مقاس '+esc(p.name)+'">'+PENCIL+'</button></div>').join('')+
+    (state.cat==='mine'?'<div class="card add"><button type="button" class="cardmain" id="addCustom"><span class="plus" aria-hidden="true">+</span><b>منتج بمقاسك</b><span class="dm">اسم ومقاس وصورة</span></button></div>':'');
+}
+function renderSelbar(){
+  const it=selItem(),p=it&&prod(it.pid),on=!!p;
+  for(const b of selbar.querySelectorAll('button')) b.disabled=!on;
+  tilt.disabled=!on;
+  if(on){
+    const c=colorOf(p,it);
+    selName.textContent=p.name;selDims.textContent=(c?c.ar+' · ':'')+dimText(p)+(p.approx?' · تقريبي':'');
+    tilt.value=it.tilt;tiltOut.textContent=num(it.tilt)+'°';actGrid.textContent=it.gid?'فك الشبكة':'شبكة';
+    actColor.disabled=!(p.colors&&p.colors.length>1&&!p.img);
+  }else{selName.textContent='دوس على منتج في الصورة';selDims.textContent='عشان تحركه أو تلفه';tilt.value=0;tiltOut.textContent='0°';actGrid.textContent='شبكة';}
+}
+function renderBadges(){
+  demoTag.hidden=!state.demo;
+  refTag.textContent=state.mode==='cal'?'حرّك العلامتين على طرفين المرجع':'المقاس مظبوط على مرجع '+num(state.cal.mm/10,2)+' سم';
+}
+function syncChips(){
+  const v=parseFloat(refCm.value);
+  for(const c of refChips.children) c.setAttribute('aria-pressed',String(parseFloat(c.dataset.cm)===v));
+}
+function setMode(m){
+  state.mode=m;
+  placeUI.hidden=m!=='place';calUI.hidden=m!=='cal';btnCal.hidden=m==='cal';
+  btnSave.hidden=m==='cal'||!downloads;
+  if(m==='cal'){refCm.value=num(state.cal.mm/10,2);syncChips();calCancel.hidden=!state.calBackup;}
+  $('#surfCeiling').setAttribute('aria-pressed',String(state.surface==='ceiling'));
+  $('#surfWall').setAttribute('aria-pressed',String(state.surface==='wall'));
+  renderBadges();renderCats();renderTray();renderSelbar();layout();
+}
+function select(id){state.sel=id;renderSelbar();renderAdorn();}
+let toastT=0;
+function toast(t){toastEl.textContent=t;toastEl.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>toastEl.classList.remove('on'),3000);}
+
+/* ---------- item actions ---------- */
+function addItem(pid){
+  if(!state.calibrated){toast('ظبّط المقاس الأول.');return;}
+  const r=stage.getBoundingClientRect(),c=toImg(r.left+r.width/2,r.top+r.height/2),o=(state.items.length%5)*14/sscale();
+  const it={id:uid++,pid:pid,color:state.lastColor[pid]||0,x:clamp(c.x+o,0,state.W),y:clamp(c.y+o,0,state.H),rot:0,tilt:0,gid:null};
+  state.items.push(it);renderItems();select(it.id);
+}
+actRot.addEventListener('click',()=>{const it=selItem();if(!it) return;it.rot=(it.rot+90)%360;renderItems();renderAdorn();});
+actDup.addEventListener('click',()=>{
+  const it=selItem(),p=it&&prod(it.pid);if(!p) return;
+  const d=Math.max(p.w*k()*1.2,36/sscale());let x=it.x+d;if(x>state.W) x=it.x-d;
+  const n={id:uid++,pid:it.pid,color:it.color||0,x:clamp(x,0,state.W),y:it.y,rot:it.rot,tilt:it.tilt,gid:null};
+  state.items.push(n);renderItems();select(n.id);
+});
+actDel.addEventListener('click',()=>{const it=selItem();if(!it) return;state.items=state.items.filter(i=>i!==it);renderItems();select(null);});
+actGrid.addEventListener('click',()=>{
+  const it=selItem();if(!it) return;
+  if(it.gid){const g=it.gid;for(const q of state.items) if(q.gid===g) q.gid=null;renderSelbar();toast('الشبكة اتفكت. كل قطعة بتتحرك لوحدها.');return;}
+  sheetGrid.hidden=false;
+});
+$('#gridOk').addEventListener('click',()=>{
+  const base=selItem();if(!base){sheetGrid.hidden=true;return;}
+  const cols=clamp(parseInt($('#gCols').value,10)||1,1,12),rows=clamp(parseInt($('#gRows').value,10)||1,1,12);
+  const dx=clamp(parseFloat($('#gDx').value)||100,1,1000)*10*k(),dy=clamp(parseFloat($('#gDy').value)||100,1,1000)*10*k();
+  const a=base.tilt*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a),gid='g'+(uid++),made=[];
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    const ux=(c-(cols-1)/2)*dx,uy=(r-(rows-1)/2)*dy;
+    made.push({id:uid++,pid:base.pid,color:base.color||0,x:base.x+ux*ca-uy*sa,y:base.y+ux*sa+uy*ca,rot:base.rot,tilt:base.tilt,gid:cols*rows>1?gid:null});
+  }
+  state.items=state.items.filter(i=>i!==base).concat(made);
+  sheetGrid.hidden=true;renderItems();select(made[0].id);
+  if(made.length>1) toast('اسحب أي قطعة والشبكة كلها هتتحرك معاها.');
+});
+tilt.addEventListener('input',()=>{const it=selItem();if(!it) return;it.tilt=parseFloat(tilt.value)||0;tiltOut.textContent=num(it.tilt)+'°';renderItems();renderAdorn();});
+catsEl.addEventListener('click',e=>{const c=e.target.closest('[data-cat]');if(!c) return;state.cat=c.dataset.cat;renderCats();renderTray();});
+tray.addEventListener('click',e=>{
+  const ed=e.target.closest('[data-edit]');
+  if(ed){const id=ed.dataset.edit;openProd(BASE[id]?'base':'custom',id);return;}
+  const b=e.target.closest('[data-pid]');
+  if(b){addItem(b.dataset.pid);return;}
+  if(e.target.closest('#addCustom')) openProd('new',null);
+});
+
+/* ---------- colours ---------- */
+actColor.addEventListener('click',()=>{
+  const it=selItem(),p=it&&prod(it.pid);if(!p||!p.colors||p.colors.length<2||p.img) return;
+  $('#colTitle').textContent=p.colors[0].en.indexOf('*')>0?'لون الإطار × الحلقة':'اللون';
+  $('#swatches').innerHTML=p.colors.map((c,i)=>'<button type="button" class="sw" data-ci="'+i+'" aria-pressed="'+(i===(it.color||0))+'"><svg viewBox="'+thumbBox(p)+'" aria-hidden="true">'+p.draw(p,c)+'</svg><span>'+c.ar+'</span></button>').join('');
+  sheetColor.hidden=false;
+});
+$('#swatches').addEventListener('click',e=>{
+  const b=e.target.closest('[data-ci]'),it=selItem();if(!b||!it) return;
+  const ci=+b.dataset.ci;
+  for(const q of state.items) if(q===it||(it.gid&&q.gid===it.gid&&q.pid===it.pid)) q.color=ci;
+  state.lastColor[it.pid]=ci;sheetColor.hidden=true;renderItems();renderTray();renderSelbar();
+});
+
+/* ---------- quantities ---------- */
+function boqRows(){
+  const m=new Map();
+  for(const it of state.items){
+    const p=prod(it.pid);if(!p) continue;
+    const c=colorOf(p,it),key=it.pid+'|'+(c?(it.color||0):'');
+    const r=m.get(key)||{p:p,c:c,n:0};r.n++;m.set(key,r);
+  }
+  return [...m.values()].map(r=>({n:r.n,name:r.p.name,en:r.p.en||'',color:r.c?r.c.ar:'',colorEn:r.c?r.c.en:'',dims:dimText(r.p),approx:!!r.p.approx,
+    text:r.n+' × '+r.p.name+(r.c?'، '+r.c.ar:'')+'، '+dimText(r.p)+(r.p.approx?' (تقريبي)':'')}));
+}
+$('#btnQty').addEventListener('click',()=>{
+  const rows=boqRows();
+  $('#boq').innerHTML=rows.length?rows.map(r=>'<li><b>'+r.n+' ×</b><span>'+esc(r.name)+(r.color?'، '+esc(r.color):'')+(r.en?'<small dir="ltr">'+esc(r.en)+(r.colorEn?' — '+esc(r.colorEn):'')+'</small>':'')+'</span><span class="dm">'+r.dims+(r.approx?' <i>تقريبي</i>':'')+'</span></li>').join(''):'<li class="empty">لسه ما حطيتش منتجات على الصورة.</li>';
+  $('#qtyCopy').disabled=!rows.length;$('#qtyClear').disabled=!rows.length;
+  sheetQty.hidden=false;
+});
+$('#qtyCopy').addEventListener('click',()=>{
+  const t=boqRows().map(r=>r.text).join('\n');
+  if(APP){try{APP.copy(t);}catch(e){toast('النسخ مش متاح هنا.');}return;}
+  try{navigator.clipboard.writeText(t).then(()=>toast('القائمة اتنسخت.'),()=>toast('النسخ مش متاح هنا.'));}catch(e){toast('النسخ مش متاح هنا.');}
+});
+$('#qtyClear').addEventListener('click',()=>{state.items=[];sheetQty.hidden=true;renderItems();select(null);});
+
+/* ---------- calibration ---------- */
+btnCal.addEventListener('click',()=>{state.calBackup={cal:Object.assign({},state.cal),calibrated:state.calibrated};state.sel=null;setMode('cal');});
+refCm.addEventListener('input',()=>{const v=parseFloat(refCm.value);if(v>0){state.cal.mm=v*10;renderItems();renderCal();}syncChips();});
+refChips.addEventListener('click',e=>{const c=e.target.closest('.chip');if(!c) return;refCm.value=c.dataset.cm;state.cal.mm=parseFloat(c.dataset.cm)*10;syncChips();renderItems();renderCal();});
+calOk.addEventListener('click',()=>{
+  const v=parseFloat(refCm.value),c=state.cal;
+  if(!(v>0)){toast('اكتب طول المرجع بالسنتيمتر.');return;}
+  if(Math.hypot(c.bx-c.ax,c.by-c.ay)<24){toast('العلامتين قريبين أوي من بعض. حطهم على طرفين المرجع.');return;}
+  c.mm=v*10;state.lastCm=v;state.calibrated=true;state.calBackup=null;setMode('place');
+  if(!state.items.length) toast('المقاس اتظبط. اختار منتج من تحت.');
+});
+calCancel.addEventListener('click',()=>{
+  const b=state.calBackup;if(!b) return;
+  state.cal=b.cal;state.calibrated=b.calibrated;state.calBackup=null;setMode('place');
+});
+
+/* ---------- surface, photo inputs, zoom ---------- */
+function setSurface(sf){state.surface=sf;state.cat=sf==='ceiling'?'spot':'generic';if(state.demo) loadDemo(sf);else setMode(state.mode);}
+$('#surfCeiling').addEventListener('click',()=>setSurface('ceiling'));
+$('#surfWall').addEventListener('click',()=>setSurface('wall'));
+for(const id of ['fileCam','filePick']) $('#'+id).addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];e.target.value='';loadPhoto(f);});
+const zoomBy=m=>zoomAt(state.fit.cw/2,state.fit.ch/2,state.view.z*m);
+$('#zIn').addEventListener('click',()=>zoomBy(1.6));
+$('#zOut').addEventListener('click',()=>zoomBy(1/1.6));
+$('#zFit').addEventListener('click',()=>{state.view={z:1,tx:0,ty:0};clampView();applyView();});
+stage.addEventListener('wheel',e=>{e.preventDefault();if(drag) return;const r=stage.getBoundingClientRect();zoomAt(e.clientX-r.left,e.clientY-r.top,state.view.z*Math.exp(-e.deltaY*.0015));},{passive:false});
+stage.addEventListener('contextmenu',e=>e.preventDefault());
+
+/* ---------- pointers: drag items and handles, pan and pinch the photo ---------- */
+let drag=null,pinch=null,bgMoved=false;const ptrs=new Map();
+function laserColor(){return getComputedStyle(document.documentElement).getPropertyValue('--laser').trim()||'#d91f2a';}
+function drawLoupe(ix,iy,e){
+  const s=sscale(),size=132,src=size/(s*3),r=stage.getBoundingClientRect();
+  lctx.fillStyle='#000';lctx.fillRect(0,0,264,264);
+  lctx.drawImage(photo,ix-src/2,iy-src/2,src,src,0,0,264,264);
+  lctx.strokeStyle=laserColor();lctx.lineWidth=2;lctx.beginPath();
+  lctx.moveTo(132,40);lctx.lineTo(132,118);lctx.moveTo(132,146);lctx.lineTo(132,224);
+  lctx.moveTo(40,132);lctx.lineTo(118,132);lctx.moveTo(146,132);lctx.lineTo(224,132);lctx.stroke();
+  let ly=e.clientY-r.top-size-52;if(ly<6) ly=e.clientY-r.top+52;
+  loupe.style.left=clamp(e.clientX-r.left-size/2,6,Math.max(6,r.width-size-6))+'px';
+  loupe.style.top=ly+'px';loupe.hidden=false;
+}
+stage.addEventListener('pointerdown',e=>{
+  if(e.button>0||drag||e.target.closest('.zoom')) return;
+  const h=e.target.closest('.handle'),el=e.target.closest('.item');
+  if(state.mode==='cal'&&h&&!ptrs.size){
+    e.preventDefault();drag={type:'h',id:h.dataset.h,pid:e.pointerId};
+    const c=state.cal;drawLoupe(drag.id==='a'?c.ax:c.bx,drag.id==='a'?c.ay:c.by,e);return;
+  }
+  if(state.mode==='place'&&el&&!ptrs.size){
+    const it=state.items.find(i=>i.id==el.dataset.id);
+    if(it){
+      e.preventDefault();select(it.id);const p=toImg(e.clientX,e.clientY);
+      drag={type:'item',pid:e.pointerId,it:it,ox:it.x-p.x,oy:it.y-p.y,
+        group:it.gid?state.items.filter(q=>q.gid===it.gid&&q!==it).map(q=>({q:q,dx:q.x-it.x,dy:q.y-it.y})):[]};
+      return;
+    }
+  }
+  ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY});
+  if(ptrs.size===1) bgMoved=false;
+  if(ptrs.size===2){const v=[...ptrs.values()];pinch={d:Math.hypot(v[0].x-v[1].x,v[0].y-v[1].y)||1,z:state.view.z};bgMoved=true;}
+});
+window.addEventListener('pointermove',e=>{
+  if(drag){
+    if(e.pointerId!==drag.pid) return;
+    const p=toImg(e.clientX,e.clientY);
+    if(drag.type==='h'){
+      const c=state.cal,x=clamp(p.x,0,state.W),y=clamp(p.y,0,state.H);
+      if(drag.id==='a'){c.ax=x;c.ay=y;}else{c.bx=x;c.by=y;}
+      renderItems();renderCal();drawLoupe(x,y,e);return;
+    }
+    let x=p.x+drag.ox,y=p.y+drag.oy,gx=null,gy=null;const th=7/sscale(),me=drag.it;
+    for(const q of state.items){
+      if(q===me||(me.gid&&q.gid===me.gid)) continue;
+      if(gx==null&&Math.abs(q.x-x)<th){x=q.x;gx=q.x;}
+      if(gy==null&&Math.abs(q.y-y)<th){y=q.y;gy=q.y;}
+    }
+    x=clamp(x,0,state.W);y=clamp(y,0,state.H);me.x=x;me.y=y;
+    for(const m of drag.group){m.q.x=x+m.dx;m.q.y=y+m.dy;}
+    state.guides=gx!=null||gy!=null?{x:gx,y:gy}:null;
+    moveItems();renderAdorn();return;
+  }
+  const pt=ptrs.get(e.pointerId);if(!pt) return;
+  if(ptrs.size===1){
+    if(Math.abs(e.clientX-pt.sx)+Math.abs(e.clientY-pt.sy)>6) bgMoved=true;
+    state.view.tx+=e.clientX-pt.x;state.view.ty+=e.clientY-pt.y;pt.x=e.clientX;pt.y=e.clientY;
+    clampView();setTransform();
+  }else if(ptrs.size===2&&pinch){
+    pt.x=e.clientX;pt.y=e.clientY;const v=[...ptrs.values()],r=stage.getBoundingClientRect();
+    zoomAt((v[0].x+v[1].x)/2-r.left,(v[0].y+v[1].y)/2-r.top,pinch.z*Math.hypot(v[0].x-v[1].x,v[0].y-v[1].y)/pinch.d);
+  }
+});
+function pointerEnd(e){
+  if(drag&&e.pointerId===drag.pid){
+    const t=drag.type;drag=null;state.guides=null;loupe.hidden=true;
+    if(t==='h') renderCal();else renderAdorn();
+    return;
+  }
+  if(!ptrs.has(e.pointerId)) return;
+  const was=ptrs.size;ptrs.delete(e.pointerId);
+  if(was===1&&!bgMoved&&e.type==='pointerup'&&state.mode==='place') select(null);
+  if(ptrs.size<2) pinch=null;
+}
+window.addEventListener('pointerup',pointerEnd);
+window.addEventListener('pointercancel',pointerEnd);
+window.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){for(const s of SHEETS) s.hidden=true;return;}
+  if(e.target.closest('input')||state.mode!=='place') return;
+  const it=selItem();if(!it) return;const st=(e.shiftKey?10:1)/sscale();
+  if(e.key==='ArrowLeft') it.x-=st;else if(e.key==='ArrowRight') it.x+=st;else if(e.key==='ArrowUp') it.y-=st;else if(e.key==='ArrowDown') it.y+=st;
+  else if(e.key==='Delete'){actDel.click();return;}else return;
+  e.preventDefault();it.x=clamp(it.x,0,state.W);it.y=clamp(it.y,0,state.H);moveItems();renderAdorn();
+});
+for(const sc of SHEETS) sc.addEventListener('click',e=>{if(e.target===sc||e.target.closest('[data-close]')) sc.hidden=true;});
+
+/* ---------- product sheet: measure once, save the real size ---------- */
+const pName=$('#pName'),pW=$('#pW'),pH=$('#pH'),pNote=$('#pNote'),pHField=$('#pHField'),pWLabel=$('#pWLabel'),pDel=$('#pDel'),pOk=$('#pOk'),pImgDel=$('#pImgDel');
+let edit=null,pShape='round',pImg=null,pImgAR=1;
+function note(t,bad){pNote.textContent=t;pNote.classList.toggle('err',!!bad);}
+function setShape(sh){
+  pShape=sh;$('#pRound').setAttribute('aria-pressed',String(sh==='round'));$('#pRect').setAttribute('aria-pressed',String(sh==='rect'));
+  pHField.hidden=sh==='round';pWLabel.textContent=sh==='round'?'القطر (مم)':'العرض (مم)';
+}
+function baseNote(){
+  if(pImg) return 'فيه صورة محفوظة للمنتج.';
+  if(!edit||edit.kind!=='base') return 'من غير صورة هيترسم شكل بسيط بنفس المقاس.';
+  const b=BASE[edit.id];
+  if(store.ov[edit.id]) return 'المقاس ده محفوظ من قياسك.';
+  return b.cat==='generic'?'ده مقاس شائع في السوق. عدّله على منتجك.':'المقاس ده تقريبي: موقع باندا مش كاتب مقاسات. قيس المنتج واكتبه هنا مرة واحدة.';
+}
+function openProd(kind,id){
+  const p=id?prod(id):null;if(kind!=='new'&&!p) return;
+  edit={kind:kind,id:id};pImg=p&&p.img||null;pImgAR=p?p.h/p.w:1;
+  $('#pTitle').textContent=kind==='new'?'منتج بمقاسك':'عدّل: '+p.name;
+  const en=$('#pEn');en.hidden=!(kind==='base'&&p.en);en.textContent=kind==='base'?p.en:'';
+  $('#pNameField').hidden=kind==='base';$('#pShapeSeg').hidden=kind==='base';
+  pName.value=kind==='custom'?p.name:'';
+  setShape(p?p.shape:'round');
+  pW.value=p?num(p.w):'';pH.value=p&&p.shape!=='round'?num(p.h):'';
+  pDel.hidden=kind==='new'||(kind==='base'&&!store.ov[id]);pDel.textContent=kind==='base'?'رجّع الافتراضي':'امسح المنتج';
+  pImgDel.hidden=!pImg;note(baseNote());pOk.disabled=false;sheetProd.hidden=false;
+}
+$('#pRound').addEventListener('click',()=>setShape('round'));
+$('#pRect').addEventListener('click',()=>setShape('rect'));
+$('#fileProd').addEventListener('change',async e=>{
+  const f=e.target.files&&e.target.files[0];e.target.value='';if(!f) return;
+  const r=await shrinkImage(f,480);
+  if(!r){note('الصورة ما اتفتحتش. جرّب JPG أو PNG.',true);return;}
+  pImg=r.data;pImgAR=r.ar;pImgDel.hidden=false;note('الصورة اتضافت وهتتحفظ مع المنتج.');
+});
+pImgDel.addEventListener('click',()=>{pImg=null;pImgDel.hidden=true;note('الصورة هتتشال لما تحفظ.');});
+pOk.addEventListener('click',async()=>{
+  if(!edit) return;
+  const w=parseFloat(pW.value);let h=parseFloat(pH.value);
+  if(!(w>=5&&w<=5000)){note('اكتب '+(pShape==='round'?'القطر':'العرض')+' بالمليمتر، من 5 إلى 5000.',true);return;}
+  if(pShape==='round') h=w;
+  else if(!(h>0)){if(pImg&&edit.kind!=='base') h=Math.round(w*pImgAR);else{note('اكتب الارتفاع بالمليمتر.',true);return;}}
+  if(!(h>=5&&h<=5000)){note('الارتفاع لازم يكون من 5 إلى 5000 مم.',true);return;}
+  pOk.disabled=true;let ok;
+  if(edit.kind==='base') ok=await putOverride(edit.id,{w:w,h:h,img:pImg});
+  else{
+    const id=edit.kind==='custom'?edit.id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    ok=await putCustom(id,{name:pName.value.trim().slice(0,40)||'منتج',w:w,h:h,shape:pShape,img:pImg,ts:Date.now()});
+    if(ok&&edit.kind==='new'){state.cat='mine';renderCats();renderTray();}
+  }
+  pOk.disabled=false;
+  if(ok){sheetProd.hidden=true;toast(edit.kind==='new'?'اتضاف في «منتجاتي». دوس عليه عشان تحطه على الصورة.':'المقاس اتحفظ.');}
+});
+pDel.addEventListener('click',async()=>{
+  if(!edit||edit.kind==='new') return;
+  pDel.disabled=true;
+  const ok=edit.kind==='base'?await dropOverride(edit.id):await dropCustom(edit.id);
+  pDel.disabled=false;
+  if(ok){sheetProd.hidden=true;toast(edit.kind==='base'?'رجع للمقاس الافتراضي.':'المنتج اتمسح.');}
+});
+
+/* ---------- logo ---------- */
+$('#logoAdd').addEventListener('click',()=>{sheetBrand.hidden=false;});
+$('#logoBtn').addEventListener('click',()=>{sheetBrand.hidden=false;});
+$('#fileLogo').addEventListener('change',async e=>{
+  const f=e.target.files&&e.target.files[0];e.target.value='';if(!f) return;
+  const r=await shrinkImage(f,420);
+  if(!r){toast('صورة اللوجو ما اتفتحتش. جرّب PNG أو JPG.');return;}
+  if(await putLogo(r.data)) toast('اللوجو اتحفظ.');
+});
+$('#brDel').addEventListener('click',async()=>{if(await putLogo(null)) toast('اللوجو اتشال.');});
+
+/* ---------- save the composed picture, with the quantities under it ---------- */
+async function composeBlob(){
+  const W=state.W,H=state.H,rows=boqRows(),shown=rows.slice(0,10),extra=rows.length-shown.length;
+  const fs=Math.max(18,Math.round(W*.03)),lh=Math.round(fs*1.7),pad=Math.round(W*.03);
+  const bandH=rows.length?pad*2+Math.round(fs*1.4)+(shown.length+(extra>0?1:0))*lh+Math.round(fs*1.8):0;
+  const out=document.createElement('canvas');out.width=W;out.height=H+bandH;const c=out.getContext('2d');
+  c.drawImage(photo,0,0);
+  const clone=overlay.cloneNode(true);
+  for(const id of ['gAdorn','gCal']){const g=clone.querySelector('#'+id);if(g) g.remove();}
+  clone.setAttribute('width',W);clone.setAttribute('height',H);
+  const im=await loadImg('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(new XMLSerializer().serializeToString(clone)));
+  c.drawImage(im,0,0,W,H);
+  if(bandH){
+    c.fillStyle='#ffffff';c.fillRect(0,H,W,bandH);
+    c.direction='rtl';c.textAlign='right';c.textBaseline='alphabetic';c.fillStyle='#15181d';
+    let y=H+pad+fs;
+    c.font='700 '+Math.round(fs*1.15)+'px Changa, Tahoma, sans-serif';c.fillText('المنتجات على الصورة',W-pad,y);
+    y+=Math.round(fs*.4);
+    c.font='500 '+fs+'px "IBM Plex Sans Arabic", Tahoma, sans-serif';
+    for(const r of shown){y+=lh;c.fillText(r.text,W-pad,y);}
+    if(extra>0){y+=lh;c.fillText('و'+extra+' صنف كمان في القائمة',W-pad,y);}
+    y+=Math.round(fs*1.6);
+    c.fillStyle='#56606b';c.font='400 '+Math.round(fs*.8)+'px "IBM Plex Sans Arabic", Tahoma, sans-serif';
+    c.fillText('معاينة بمقياس محسوب على مرجع '+num(state.cal.mm/10,2)+' سم',W-pad,y);
+    if(logoEl&&logoEl.naturalHeight){
+      const lhh=Math.min(bandH-2*pad,W*.09),lw=Math.min(W*.28,lhh*logoEl.naturalWidth/logoEl.naturalHeight);
+      c.drawImage(logoEl,pad,H+pad,lw,lw*logoEl.naturalHeight/logoEl.naturalWidth);
+    }
+  }
+  return new Promise((res,rej)=>out.toBlob(b=>b?res(b):rej(new Error('blob')),'image/jpeg',.92));
+}
+btnSave.addEventListener('click',async()=>{
+  if(!downloads) return;btnSave.disabled=true;
+  try{const blob=await composeBlob();await downloads.save({filename:'panda_'+Date.now()+'.jpg',data:blob});if(!APP) toast('الصورة اتحفظت.');}
+  catch(err){const code=err&&err.code;if(code==='rate_limited') toast('استنى لحظة وجرّب تاني.');else if(code!=='declined') toast('الحفظ مش متاح هنا دلوقتي.');}
+  finally{btnSave.disabled=false;}
+});
+
+/* ---------- capabilities: downloads, and the shared store for sizes, own products and logo ---------- */
+let askedDl=false,askedDb=false;
+function wireCaps(){
+  const c=window.claude;if(!c||typeof c.use!=='function') return;
+  if(APP) return;
+  if(!askedDl){askedDl=true;c.use('downloads').then(d=>{if(d){downloads=d;btnSave.hidden=state.mode==='cal';}}).catch(()=>{});}
+  if(!askedDb){
+    askedDb=true;
+    c.use('db').then(d=>{
+      if(!d) return;
+      db=d;store.ov={};store.custom=[];store.logo=null;catalogChanged();logoChanged();
+      dbTimer=setTimeout(()=>{if(!dbFresh) toast('المقاسات المحفوظة لسه ما اتحملتش. اللي ظاهر ممكن يكون الافتراضي.');},10000);
+      const seen=s=>{if(s&&s.metadata&&!s.metadata.fromCache){dbFresh=true;clearTimeout(dbTimer);}};
+      const fail=()=>{dbFresh=true;clearTimeout(dbTimer);};
+      db.collection('overrides').onSnapshot(s=>{const m={};for(const x of s.docs){const o=cleanOv(x.data());if(o&&BASE[x.id]) m[x.id]=o;}store.ov=m;seen(s);catalogChanged();},fail);
+      db.collection('custom').onSnapshot(s=>{store.custom=s.docs.map(x=>cleanCustom(x.id,x.data())).filter(Boolean);seen(s);catalogChanged();},fail);
+      db.doc('settings/brand').onSnapshot(s=>{const v=s.exists?s.data():null;store.logo=okImg(v&&v.logo);seen(s);logoChanged();},fail);
+    }).catch(()=>{});
+  }
+}
+
+/* ---------- Android app: save to gallery, live camera, back button ---------- */
+function blobToB64(b){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]||'');r.onerror=()=>rej(r.error);r.readAsDataURL(b);});}
+function pot(n){let p=32;while(p<n&&p<1024) p*=2;return p;}
+async function productPng(p,ci){
+  const L=512,cw=p.w>=p.h?L:pot(L*p.w/p.h),ch=p.h>p.w?L:pot(L*p.h/p.w);
+  const defs=overlay.querySelector('defs').outerHTML;
+  const art=artFor(p,ci).replace(/<circle r="[^"]*" fill="url\(#gGlow\)"\/>/g,'');
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+(-p.w/2)+' '+(-p.h/2)+' '+p.w+' '+p.h+'" width="'+cw+'" height="'+ch+'" preserveAspectRatio="none">'+defs+art+'</svg>';
+  const im=await loadImg('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg));
+  const c=document.createElement('canvas');c.width=cw;c.height=ch;c.getContext('2d').drawImage(im,0,0,cw,ch);
+  let d=c.toDataURL('image/webp',.9);if(d.indexOf('data:image/webp')!==0) d=c.toDataURL('image/png');
+  return d.split(',')[1];
+}
+const SURF_ORDER={ceiling:['spot','panel','track','holder','wallbox','generic','mine'],wall:['wallbox','generic','spot','track','holder','panel','mine']};
+async function startLive(){
+  const btn=$('#btnLive');if(btn.disabled) return;
+  btn.disabled=true;toast('بجهّز المنتجات للكاميرا…');
+  try{
+    const order=SURF_ORDER[state.surface];
+    const list=BASE_LIST.map(b=>prod(b.id)).concat(store.custom).filter(Boolean)
+      .sort((a,b)=>order.indexOf(a.cat)-order.indexOf(b.cat));
+    const out=[];
+    for(const p of list){
+      const vs=[];
+      if(p.colors&&!p.img){for(let i=0;i<p.colors.length;i++) vs.push({label:p.colors[i].ar,png:await productPng(p,i)});}
+      else vs.push({label:'',png:await productPng(p,0)});
+      out.push({id:p.id,name:p.name,w:p.w,h:p.h,variant:state.lastColor[p.id]||0,variants:vs});
+    }
+    const it=selItem(),start=it?it.pid:(list.find(p=>p.cat===state.cat)||list[0]).id;
+    APP.startAr(JSON.stringify({products:out,start:start}));
+  }catch(e){toast('الكاميرا اللايف ما اشتغلتش. جرّب تاني.');}
+  finally{btn.disabled=false;}
+}
+const APP=(window.AndroidApp&&typeof window.AndroidApp.isApp==='function')?window.AndroidApp:null;
+if(APP){
+  downloads={save:async({filename,data})=>{const r=APP.saveImage(await blobToB64(data),filename);if(r!=='saved') throw {code:'unavailable'};return {status:'saved'};}};
+  let st='unsupported';try{st=APP.arStatus();}catch(e){}
+  $('#btnLive').hidden=st==='unsupported';
+  if(st==='checking') setTimeout(()=>{try{$('#btnLive').hidden=APP.arStatus()==='unsupported';}catch(e){}},1500);
+  $('#btnLive').addEventListener('click',startLive);
+  window.__androidBack=()=>{
+    const open=SHEETS.find(s=>!s.hidden);if(open){open.hidden=true;return true;}
+    if(state.mode==='cal'&&state.calBackup){calCancel.click();return true;}
+    return false;
+  };
+}
+
+/* ---------- start ---------- */
+loadLocal();logoChanged();
+loadDemo('ceiling');
+if(APP) btnSave.hidden=false;
+if(window.ResizeObserver) new ResizeObserver(layout).observe(stage);else window.addEventListener('resize',layout);
+wireCaps();window.addEventListener('load',wireCaps);
+})();
+</script>
+</body>
+</html>

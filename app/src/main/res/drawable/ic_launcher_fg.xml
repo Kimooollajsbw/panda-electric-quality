@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- spot ring -->
+    <path android:fillColor="#F4F4F2" android:pathData="M54,30a24,24 0,1 1,0 48a24,24 0,1 1,0 -48z" />
+    <path android:fillColor="#C9A449" android:pathData="M54,37a17,17 0,1 1,0 34a17,17 0,1 1,0 -34z" />
+    <path android:fillColor="#26282C" android:pathData="M54,41a13,13 0,1 1,0 26a13,13 0,1 1,0 -26z" />
+    <path android:fillColor="#FFEAA2" android:pathData="M54,44a10,10 0,1 1,0 20a10,10 0,1 1,0 -20z" />
+    <!-- laser measuring line -->
+    <path android:fillColor="#D91F2A" android:pathData="M24,82h60v3h-60z" />
+    <path android:fillColor="#D91F2A" android:pathData="M24,78h3v11h-3zM81,78h3v11h-3z" />
+</vector>
