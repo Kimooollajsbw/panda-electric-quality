@@ -3,6 +3,7 @@ name: Build APK
 on:
   push:
     branches: [ "android-app" ]
+    paths-ignore: [ "tools/**", "photos/**", ".github/workflows/photos.yml" ]
   workflow_dispatch:
 
 permissions:

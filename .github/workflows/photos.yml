@@ -1,0 +1,28 @@
+name: Fetch product photos
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "android-app" ]
+    paths: [ "tools/photos_manifest.json", "tools/fetch_photos.py" ]
+
+permissions:
+  contents: write
+
+jobs:
+  photos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "rembg[cpu]==2.0.67" pillow
+      - run: python tools/fetch_photos.py
+      - name: Commit the photos back to the branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add photos
+          git commit -m "صور المنتجات من panda-electric.com (أصلية + مقصوصة)" || echo "nothing to commit"
+          git push
