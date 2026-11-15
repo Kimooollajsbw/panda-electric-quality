@@ -79,7 +79,7 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         val bitmap: Bitmap? by lazy { BitmapFactory.decodeByteArray(png, 0, png.size) }
     }
 
-    class Product(val id: String, val name: String, val wMm: Float, val hMm: Float, val variants: List<Variant>)
+    class Product(val id: String, val name: String, val wMm: Float, val hMm: Float, val lens: Float, val variants: List<Variant>)
 
     class Item(
         val product: Product,
@@ -92,6 +92,11 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
     )
 
     private var products: List<Product> = emptyList()
+    @Volatile private var lightMode = 0   // 0 warm, 1 white, 2 off
+    private val lightNames = arrayOf("نور وورم", "نور أبيض", "مطفي")
+    private val ambient = floatArrayOf(1f, 1f, 1f)
+    private var glowProg = 0
+    private lateinit var btnLight: TextView
     private var current = 0
     private val variantOf = HashMap<String, Int>()
 
@@ -165,10 +170,11 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
                 val w = p.getDouble("w").toFloat()
                 val h = p.getDouble("h").toFloat()
                 if (list.isNotEmpty() && w > 0 && h > 0) {
-                    out.add(Product(p.getString("id"), p.optString("name"), w, h, list))
+                    out.add(Product(p.getString("id"), p.optString("name"), w, h, p.optDouble("light", 0.0).toFloat(), list))
                     variantOf[p.getString("id")] = p.optInt("variant", 0).coerceIn(0, list.size - 1)
                 }
             }
+            lightMode = when (j.optString("light")) { "white" -> 1; "off" -> 2; else -> 0 }
             val start = j.optString("start")
             current = out.indexOfFirst { it.id == start }.coerceAtLeast(0)
             out
@@ -245,6 +251,10 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         }
         action("لف 90°") { glQueue.add { selected?.let { it.rot = (it.rot + 90) % 360 } } }
         btnColor = action("اللون") { cycleColor() }
+        btnLight = action(lightNames[lightMode]) {
+            lightMode = (lightMode + 1) % 3
+            btnLight.text = lightNames[lightMode]
+        }
         action("امسح") { glQueue.add { selected?.let { removeItem(it) } } }
         action("امسح الكل") { glQueue.add { for (it in ArrayList(items)) removeItem(it) } }
         action("صوّر", accent = true) { captureRequested = true }
@@ -374,7 +384,7 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
                 c.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                 c.focusMode = Config.FocusMode.AUTO
                 c.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                c.lightEstimationMode = Config.LightEstimationMode.DISABLED
+                c.lightEstimationMode = Config.LightEstimationMode.AMBIENT_INTENSITY
                 if (s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) c.depthMode = Config.DepthMode.AUTOMATIC
                 s.configure(c)
                 session = s
@@ -455,8 +465,19 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
             void main(){ gl_Position = u_Mvp * a_Pos; v_Uv = a_Uv; }
             """.trimIndent(),
             """
-            precision mediump float; varying vec2 v_Uv; uniform sampler2D u_Tex;
-            void main(){ gl_FragColor = texture2D(u_Tex, v_Uv); }
+            precision mediump float; varying vec2 v_Uv; uniform sampler2D u_Tex; uniform vec3 u_Mul;
+            void main(){ vec4 c = texture2D(u_Tex, v_Uv); gl_FragColor = vec4(c.rgb * u_Mul, c.a); }
+            """.trimIndent()
+        )
+        glowProg = GlUtil.program(
+            """
+            uniform mat4 u_Mvp; attribute vec4 a_Pos; attribute vec2 a_Uv; varying vec2 v_Uv;
+            void main(){ gl_Position = u_Mvp * a_Pos; v_Uv = a_Uv; }
+            """.trimIndent(),
+            """
+            precision mediump float; varying vec2 v_Uv; uniform vec3 u_Color; uniform float u_Sharp; uniform float u_Gain;
+            void main(){ float d = distance(v_Uv, vec2(0.5)) * 2.0; float a = exp(-d * d * u_Sharp) * u_Gain;
+              gl_FragColor = vec4(u_Color * a, 1.0); }
             """.trimIndent()
         )
     }
@@ -493,6 +514,16 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
 
         val tracking = camera.trackingState == TrackingState.TRACKING
         lastFrame = frame
+        // dim and tint the studio photos to the room's light
+        runCatching {
+            val le = frame.lightEstimate
+            if (le.state == com.google.ar.core.LightEstimate.State.VALID) {
+                val cc = FloatArray(4)
+                le.getColorCorrection(cc, 0)
+                val k = cc[3] / 0.466f
+                for (i in 0..2) ambient[i] = (cc[i] * k).coerceIn(0.3f, 1.15f)
+            }
+        }
         while (true) {
             val job = glQueue.poll() ?: break
             runCatching { job.invoke() }
@@ -672,6 +703,7 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tex)
             GLES20.glUniform1i(GLES20.glGetUniformLocation(texProg, "u_Tex"), 0)
+            GLES20.glUniform3f(GLES20.glGetUniformLocation(texProg, "u_Mul"), ambient[0], ambient[1], ambient[2])
             val pos = GlUtil.floats(-hw, hh, 0f, hw, hh, 0f, -hw, -hh, 0f, hw, -hh, 0f)
             quadUv.position(0)
             val aPos = GLES20.glGetAttribLocation(texProg, "a_Pos")
@@ -683,6 +715,7 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
             GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
             GLES20.glDisableVertexAttribArray(aPos)
             GLES20.glDisableVertexAttribArray(aUv)
+            if (it.product.lens > 0f && lightMode != 2) drawGlow(it)
             if (it === selected && !captureRequested) {
                 val pad = 0.006f
                 val box = floatArrayOf(-hw - pad, hh + pad, 0.001f, hw + pad, hh + pad, 0.001f, hw + pad, -hh - pad, 0.001f, -hw - pad, -hh - pad, 0.001f)
@@ -690,6 +723,36 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
                 drawColor(it.model, box, 4, GLES20.GL_LINE_LOOP, 0.85f, 0.12f, 0.16f, 1f)
             }
         }
+    }
+
+    /** A lit lamp: a bright core on the lens and a soft halo on the surface around it, added on top. */
+    private fun drawGlow(it: Item) {
+        val lens = it.product.wMm / 1000f * it.product.lens
+        val col = if (lightMode == 1) floatArrayOf(0.93f, 0.96f, 1f) else floatArrayOf(1f, 0.85f, 0.62f)
+        GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE)
+        GLES20.glUseProgram(glowProg)
+        Matrix.multiplyMM(mvp, 0, vp, 0, it.model, 0)
+        GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(glowProg, "u_Mvp"), 1, false, mvp, 0)
+        val aPos = GLES20.glGetAttribLocation(glowProg, "a_Pos")
+        val aUv = GLES20.glGetAttribLocation(glowProg, "a_Uv")
+        fun pass(radius: Float, sharp: Float, gain: Float, c: FloatArray) {
+            val r = radius
+            val pos = GlUtil.floats(-r, r, 0.001f, r, r, 0.001f, -r, -r, 0.001f, r, -r, 0.001f)
+            quadUv.position(0)
+            GLES20.glUniform3f(GLES20.glGetUniformLocation(glowProg, "u_Color"), c[0], c[1], c[2])
+            GLES20.glUniform1f(GLES20.glGetUniformLocation(glowProg, "u_Sharp"), sharp)
+            GLES20.glUniform1f(GLES20.glGetUniformLocation(glowProg, "u_Gain"), gain)
+            GLES20.glVertexAttribPointer(aPos, 3, GLES20.GL_FLOAT, false, 0, pos)
+            GLES20.glVertexAttribPointer(aUv, 2, GLES20.GL_FLOAT, false, 0, quadUv)
+            GLES20.glEnableVertexAttribArray(aPos)
+            GLES20.glEnableVertexAttribArray(aUv)
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+            GLES20.glDisableVertexAttribArray(aPos)
+            GLES20.glDisableVertexAttribArray(aUv)
+        }
+        pass(lens * 8f, 5f, 0.35f, col)                       // halo on the ceiling
+        pass(lens * 1.5f, 3.5f, 1.1f, floatArrayOf(1f, 0.97f, 0.9f)) // white-hot lens
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
     }
 
     // ---------- touch handling (runs on the GL thread) ----------

@@ -91,6 +91,7 @@ button:disabled{opacity:.45;cursor:default}
 .zoom svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .live{position:absolute;bottom:12px;inset-inline-start:12px;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:6px 16px;border:0;border-radius:999px;background:var(--laser);color:var(--on-laser);font-weight:700;font-family:var(--font-display);font-size:15px;box-shadow:0 4px 14px rgba(0,0,0,.35)}
 .live svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.live.calhide{display:none}
 #loupe{position:absolute;width:132px;height:132px;border-radius:50%;border:2px solid var(--on-photo);box-shadow:0 6px 20px rgba(0,0,0,.5);pointer-events:none}
 
 .panel{background:var(--surface);border-top:1px solid var(--line);padding:10px 0 12px;display:grid;gap:10px;align-content:start;min-width:0}
@@ -107,7 +108,8 @@ button:disabled{opacity:.45;cursor:default}
 .tilt{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);flex:0 0 auto}
 .tilt input{width:76px;accent-color:var(--laser)}
 .tilt output{min-width:38px;text-align:center;font-variant-numeric:tabular-nums;direction:ltr}
-.selacts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+.selacts{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
+.calrow .field.half{flex:1 1 100px}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:6px 10px;border-radius:var(--r);border:1px solid var(--line);background:var(--bg);font-weight:600;text-align:center;line-height:1.2;font-size:14px;cursor:pointer}
 .btn.sm{min-height:38px;font-size:13px;background:var(--surface);padding-inline:4px}
@@ -136,6 +138,8 @@ button:disabled{opacity:.45;cursor:default}
 .x svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 .cal{display:grid;gap:8px;padding-inline:16px}
+.cal .cal{padding-inline:0}
+.calrow .grow{flex:1 1 auto}
 .cal h2{font-size:17px}
 .cal p{font-size:13.5px;max-width:65ch}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
@@ -212,6 +216,11 @@ button:disabled{opacity:.45;cursor:default}
           <linearGradient id="gTrim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d7dbdf"/></linearGradient>
           <linearGradient id="gPlate" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e6e9ec"/></linearGradient>
           <linearGradient id="gBody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d444c"/><stop offset="1" stop-color="#22262c"/></linearGradient>
+          <radialGradient id="gLens_warm"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#fff4dc"/><stop offset=".8" stop-color="#ffd9a0" stop-opacity=".55"/><stop offset="1" stop-color="#ffc878" stop-opacity="0"/></radialGradient>
+          <radialGradient id="gLens_white"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#f7fbff"/><stop offset=".8" stop-color="#dfeaff" stop-opacity=".55"/><stop offset="1" stop-color="#cfe0ff" stop-opacity="0"/></radialGradient>
+          <radialGradient id="gBloom_warm"><stop offset="0" stop-color="#fff1d6" stop-opacity=".95"/><stop offset=".12" stop-color="#ffe2b0" stop-opacity=".7"/><stop offset=".35" stop-color="#ffcf8a" stop-opacity=".22"/><stop offset="1" stop-color="#ffbe6e" stop-opacity="0"/></radialGradient>
+          <radialGradient id="gBloom_white"><stop offset="0" stop-color="#f8fbff" stop-opacity=".95"/><stop offset=".12" stop-color="#e9f1ff" stop-opacity=".7"/><stop offset=".35" stop-color="#d8e6ff" stop-opacity=".22"/><stop offset="1" stop-color="#c8dcff" stop-opacity="0"/></radialGradient>
+          <filter id="fSoft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.4"/></filter>
           <linearGradient id="gSheen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".4"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".16"/></linearGradient>
         </defs>
         <g id="gItems"></g>
@@ -242,6 +251,7 @@ button:disabled{opacity:.45;cursor:default}
           <button type="button" class="btn sm" id="actDup">كرّر</button>
           <button type="button" class="btn sm" id="actGrid">شبكة</button>
           <button type="button" class="btn sm" id="actColor">اللون</button>
+          <button type="button" class="btn sm" id="actLight">النور</button>
           <button type="button" class="btn sm danger" id="actDel">امسح</button>
         </div>
       </div>
@@ -253,21 +263,41 @@ button:disabled{opacity:.45;cursor:default}
     </div>
 
     <div class="cal" id="calUI" hidden>
-      <h2>ظبّط المقاس</h2>
-      <p>حط العلامتين على طرفين حاجة مقاسها معروف في الصورة، وبعدين اختار طولها.</p>
-      <div class="chips" id="refChips" role="group" aria-label="مراجع جاهزة">
-        <button type="button" class="chip" data-cm="29.7">طول ورقة A4 · 29.7</button>
-        <button type="button" class="chip" data-cm="8.56">كارت بنكي · 8.56</button>
-        <button type="button" class="chip" data-cm="60">بلاطة · 60</button>
-        <button type="button" class="chip" data-cm="90">عرض باب · 90</button>
-        <button type="button" class="chip" data-cm="100">متر · 100</button>
+      <h2>ظبّط المقاس والمنظور</h2>
+      <div class="seg" role="group" aria-label="طريقة الضبط" style="justify-self:start">
+        <button type="button" id="calKindQuad" aria-pressed="true">4 نقط</button>
+        <button type="button" id="calKindLine" aria-pressed="false">خط</button>
+      </div>
+      <div id="quadFields" class="cal">
+        <p>حط الـ 4 نقط على أركان مستطيل على نفس السطح ومقاسه معروف: أركان السقف كله، إطار الجبس، بلاطة، أو باب. وبعدين اكتب عرضه وطوله.</p>
+        <div class="chips" id="quadChips" role="group" aria-label="مستطيلات جاهزة">
+          <button type="button" class="chip" data-w="60" data-h="60">بلاطة 60 × 60</button>
+          <button type="button" class="chip" data-w="21" data-h="29.7">ورقة A4</button>
+          <button type="button" class="chip" data-w="90" data-h="210">باب 90 × 210</button>
+          <button type="button" class="chip" data-w="120" data-h="240">لوح جبس 120 × 240</button>
+        </div>
+        <div class="calrow">
+          <label class="field half" for="refW"><span>العرض: من نقطة 1 لـ 2 (سم)</span><input id="refW" type="number" inputmode="decimal" min="1" max="5000" step="0.1"></label>
+          <label class="field half" for="refH"><span>الطول: من نقطة 2 لـ 3 (سم)</span><input id="refH" type="number" inputmode="decimal" min="1" max="5000" step="0.1"></label>
+        </div>
+      </div>
+      <div id="lineFields" class="cal" hidden>
+        <p>للصور المصوّرة على استقامة بس: حط العلامتين على طرفين حاجة مقاسها معروف.</p>
+        <div class="chips" id="refChips" role="group" aria-label="مراجع جاهزة">
+          <button type="button" class="chip" data-cm="29.7">طول ورقة A4 · 29.7</button>
+          <button type="button" class="chip" data-cm="60">بلاطة · 60</button>
+          <button type="button" class="chip" data-cm="90">عرض باب · 90</button>
+          <button type="button" class="chip" data-cm="100">متر · 100</button>
+        </div>
+        <div class="calrow">
+          <label class="field" for="refCm"><span>الطول بين العلامتين (سم)</span><input id="refCm" type="number" inputmode="decimal" min="1" max="2000" step="0.01"></label>
+        </div>
       </div>
       <div class="calrow">
-        <label class="field" for="refCm"><span>الطول بين العلامتين (سم)</span><input id="refCm" type="number" inputmode="decimal" min="1" max="2000" step="0.01"></label>
+        <span class="grow"></span>
         <button type="button" class="btn" id="calCancel">رجوع</button>
         <button type="button" class="btn primary" id="calOk">تمام</button>
       </div>
-      <p class="tip">للدقة: اقف قصاد السطح وصوّر على استقامة، وخلّي المرجع قريب من مكان التركيب.</p>
     </div>
 
     <div class="actions">
@@ -478,10 +508,10 @@ function artFor(p,ci){
    until someone measures the product and saves the real size. */
 const CATS=[{id:'spot',name:'سبوت'},{id:'panel',name:'بانل'},{id:'track',name:'ماجنتك تراك'},{id:'holder',name:'دواية ديكور'},{id:'wallbox',name:'أجراس وعلب'},{id:'mine',name:'منتجاتي'}];
 const BASE_LIST=[
-  {id:'sp-round',cat:'spot',name:'سبوت مدور',en:'MR16 / GU5.3 Swivel Frame, Round Model',w:90,h:90,shape:'round',colors:ROUND_REAL,draw:(p,c)=>A.spotFrame('round',p.w,c.c)},
-  {id:'sp-square',cat:'spot',name:'سبوت مربع',en:'MR16 / GU5.3 Swivel Frame, Square Model',w:90,h:90,shape:'rect',colors:SQUARE_REAL,draw:(p,c)=>A.spotFrame('square',Math.min(p.w,p.h),c.c)},
-  {id:'sp-anti',cat:'spot',name:'سبوت مانع للتوهج',en:'MR16 / GU5.3 Swivel Frame, Round Anti Glare Ring',w:90,h:90,shape:'round',colors:ANTI_REAL,draw:(p,c)=>A.spotFrame('round',p.w,c.c,true)},
-  {id:'pn-smd26',cat:'panel',name:'بانل SMD مدور 26 وات',en:'Led Panel SMD 26W Round',w:300,h:300,photo:'pn-smd26',shape:'round',draw:p=>A.panelRound(p.w)},
+  {id:'sp-round',light:.25,cat:'spot',name:'سبوت مدور',en:'MR16 / GU5.3 Swivel Frame, Round Model',w:90,h:90,shape:'round',colors:ROUND_REAL,draw:(p,c)=>A.spotFrame('round',p.w,c.c)},
+  {id:'sp-square',light:.25,cat:'spot',name:'سبوت مربع',en:'MR16 / GU5.3 Swivel Frame, Square Model',w:90,h:90,shape:'rect',colors:SQUARE_REAL,draw:(p,c)=>A.spotFrame('square',Math.min(p.w,p.h),c.c)},
+  {id:'sp-anti',light:.17,cat:'spot',name:'سبوت مانع للتوهج',en:'MR16 / GU5.3 Swivel Frame, Round Anti Glare Ring',w:90,h:90,shape:'round',colors:ANTI_REAL,draw:(p,c)=>A.spotFrame('round',p.w,c.c,true)},
+  {id:'pn-smd26',light:.47,cat:'panel',name:'بانل SMD مدور 26 وات',en:'Led Panel SMD 26W Round',w:300,h:300,photo:'pn-smd26',shape:'round',draw:p=>A.panelRound(p.w)},
   {id:'tr-spot',cat:'track',name:'سبوت تراك',en:'Track Spotlight',w:70,h:113,photo:'tr-spot',shape:'rect',draw:p=>A.bar(p.w,p.h,'spot')},
   {id:'tr-rflood',cat:'track',name:'فلود تراك مدور',en:'Round Track Floodlight',w:300,h:126,photo:'tr-rflood',shape:'rect',draw:p=>A.bar(p.w,p.h,'flood')},
   {id:'tr-rspot',cat:'track',name:'سبوت فلود مدور',en:'Round Spot Floodlight',w:300,h:86,photo:'tr-rspot',shape:'rect',draw:p=>A.bar(p.w,p.h,'spot')},
@@ -504,6 +534,7 @@ const stage=$('#stage'),inner=$('#stageInner'),photo=$('#photo'),pctx=photo.getC
 const overlay=$('#overlay'),gItems=$('#gItems'),gScale=$('#gScale'),gAdorn=$('#gAdorn'),gCal=$('#gCal');
 const loupe=$('#loupe'),lctx=loupe.getContext('2d');
 const tray=$('#tray'),catsEl=$('#cats'),selbar=$('#selbar'),selName=$('#selName'),selDims=$('#selDims'),tilt=$('#tilt'),tiltOut=$('#tiltOut');
+const actLight=$('#actLight');
 const actRot=$('#actRot'),actDup=$('#actDup'),actGrid=$('#actGrid'),actColor=$('#actColor'),actDel=$('#actDel');
 const placeUI=$('#placeUI'),calUI=$('#calUI'),refCm=$('#refCm'),refChips=$('#refChips'),calOk=$('#calOk'),calCancel=$('#calCancel');
 const demoTag=$('#demoTag'),refTag=$('#refTag'),countEl=$('#count'),btnCal=$('#btnCal'),btnSave=$('#btnSave'),toastEl=$('#toast');
@@ -513,8 +544,55 @@ const SHEETS=[sheetGrid,sheetProd,sheetColor,sheetQty,sheetBrand];
 /* ---------- state ---------- */
 let uid=1,downloads=null,db=null,dbFresh=false,dbTimer=0,logoEl=null;
 const state={surface:'ceiling',cat:'spot',demo:true,W:1,H:1,cal:{ax:0,ay:0,bx:1,by:0,mm:1},calibrated:false,items:[],sel:null,mode:'place',
-  view:{z:1,tx:0,ty:0},fit:{f:1,left:0,top:0,cw:1,ch:1},guides:null,calBackup:null,lastCm:29.7,lastColor:{'sp-round':4}};
-const k=()=>pxPerMm(state.cal);
+  view:{z:1,tx:0,ty:0},fit:{f:1,left:0,top:0,cw:1,ch:1},guides:null,calBackup:null,lastCm:29.7,lastColor:{'sp-round':4},lastLight:'warm'};
+/* The surface is a plane measured in millimetres. H maps (u,v) mm on it to (x,y) px in the photo.
+   With 4 points it is a full perspective homography; with the 2-point line it is a plain scale. */
+function solveH(src,dst){
+  const A=[],b=[];
+  for(let i=0;i<4;i++){
+    const u=src[i][0],v=src[i][1],x=dst[i][0],y=dst[i][1];
+    A.push([u,v,1,0,0,0,-u*x,-v*x]);b.push(x);
+    A.push([0,0,0,u,v,1,-u*y,-v*y]);b.push(y);
+  }
+  for(let c=0;c<8;c++){
+    let piv=c;for(let r=c+1;r<8;r++) if(Math.abs(A[r][c])>Math.abs(A[piv][c])) piv=r;
+    if(Math.abs(A[piv][c])<1e-12) return null;
+    [A[c],A[piv]]=[A[piv],A[c]];[b[c],b[piv]]=[b[piv],b[c]];
+    for(let r=0;r<8;r++){if(r===c) continue;const f=A[r][c]/A[c][c];if(!f) continue;for(let k2=c;k2<8;k2++) A[r][k2]-=f*A[c][k2];b[r]-=f*b[c];}
+  }
+  const h=b.map((v,i)=>v/A[i][i]);
+  return [h[0],h[1],h[2],h[3],h[4],h[5],h[6],h[7],1];
+}
+function invert3(m){
+  const [a,b,c,d,e,f,g,h,i]=m,A=e*i-f*h,B=-(d*i-f*g),C=d*h-e*g,det=a*A+b*B+c*C;
+  if(Math.abs(det)<1e-15) return null;
+  return [A/det,-(b*i-c*h)/det,(b*f-c*e)/det,B/det,(a*i-c*g)/det,-(a*f-c*d)/det,C/det,-(a*h-b*g)/det,(a*e-b*d)/det];
+}
+function mapH(m,u,v){const w=m[6]*u+m[7]*v+m[8];return {x:(m[0]*u+m[1]*v+m[2])/w,y:(m[3]*u+m[4]*v+m[5])/w,w:w};}
+let Hc={key:'',H:null,Hi:null};
+function quadH(c){
+  return solveH([[0,0],[c.wmm,0],[c.wmm,c.hmm],[0,c.hmm]],c.q.map(p=>[p.x,p.y]));
+}
+function homo(){
+  const c=state.cal,key=JSON.stringify(c);
+  if(Hc.key!==key){
+    let H=null;
+    if(c.kind==='quad') H=quadH(c);
+    if(!H){const kk=pxPerMm(c);H=[kk,0,0,0,kk,0,0,0,1];}
+    Hc={key:key,H:H,Hi:invert3(H)};
+  }
+  return Hc;
+}
+const toPlane=(x,y)=>{const r=mapH(homo().Hi,x,y);return {u:r.x,v:r.y};};
+const toImgPt=(u,v)=>mapH(homo().H,u,v);
+/* local linear map at a photo point: millimetres on the surface to pixels */
+function jac(x,y){
+  const H=homo().H,q=toPlane(x,y),p0=mapH(H,q.u,q.v),pu=mapH(H,q.u+1,q.v),pv=mapH(H,q.u,q.v+1);
+  return {a:pu.x-p0.x,b:pu.y-p0.y,c:pv.x-p0.x,d:pv.y-p0.y};
+}
+const scaleAt=(x,y)=>{const J=jac(x,y);return Math.sqrt(Math.abs(J.a*J.d-J.b*J.c))||1e-6;};
+const k=()=>scaleAt(state.W/2,state.H/2);
+function planeDist(a,b){const p=toPlane(a.x,a.y),q=toPlane(b.x,b.y);return Math.hypot(p.u-q.u,p.v-q.v);}
 const sscale=()=>state.fit.f*state.view.z;
 const selItem=()=>state.items.find(i=>i.id===state.sel)||null;
 
@@ -622,16 +700,16 @@ function loadDemo(sf){
   state.demo=true;state.calBackup=null;state.view={z:1,tx:0,ty:0};state.items=[];
   if(sf==='ceiling'){
     setCanvas(1600,1100);drawCeiling(pctx,1600,1100);
-    state.cal={ax:1190,ay:410,bx:1430,by:410,mm:600};
-    for(const y of [380,780]) for(const x of [300,700,1100]) state.items.push({id:uid++,pid:'sp-round',color:4,x:x,y:y,rot:0,tilt:0,gid:'demo'});
+    state.cal={kind:'line',ax:1190,ay:410,bx:1430,by:410,mm:600,q:null,wmm:600,hmm:600};
+    for(const y of [380,780]) for(const x of [300,700,1100]) state.items.push({id:uid++,pid:'sp-round',color:4,light:'warm',x:x,y:y,rot:0,tilt:0,gid:'demo'});
     state.sel=state.items[1].id;
   }else{
     setCanvas(1600,1180);drawWall(pctx,1600,1180);
-    state.cal={ax:1000,ay:560,bx:1360,by:560,mm:900};
+    state.cal={kind:'line',ax:1000,ay:560,bx:1360,by:560,mm:900,q:null,wmm:900,hmm:2100};
     state.items.push({id:uid++,pid:'db-ding',color:0,x:820,y:560,rot:0,tilt:0,gid:null},{id:uid++,pid:'db-bird',color:0,x:420,y:560,rot:0,tilt:0,gid:null});
     state.sel=state.items[0].id;
   }
-  state.calibrated=true;setMode('place');
+  Hc.key='';state.calibrated=true;setMode('place');
 }
 
 /* ---------- photo ---------- */
@@ -645,7 +723,9 @@ async function loadPhoto(file){
     setCanvas(Math.max(1,Math.round(im.naturalWidth*f)),Math.max(1,Math.round(im.naturalHeight*f)));
     pctx.drawImage(im,0,0,state.W,state.H);
     state.demo=false;state.items=[];state.sel=null;state.calibrated=false;state.calBackup=null;
-    state.cal={ax:state.W*.3,ay:state.H*.5,bx:state.W*.7,by:state.H*.5,mm:state.lastCm*10};
+    const prev=state.cal||{};
+    state.cal={kind:'quad',ax:state.W*.3,ay:state.H*.5,bx:state.W*.7,by:state.H*.5,mm:state.lastCm*10,q:null,wmm:prev.wmm||600,hmm:prev.hmm||600};
+    state.cal.q=defaultQuad();Hc.key='';
     state.view={z:1,tx:0,ty:0};
     setMode('cal');
   }catch(e){toast('الصورة ما اتفتحتش. جرّب صورة JPG أو PNG.');}
@@ -689,18 +769,56 @@ function zoomAt(px,py,z2){
 function toImg(cx,cy){const r=inner.getBoundingClientRect();return{x:(cx-r.left)/r.width*state.W,y:(cy-r.top)/r.height*state.H};}
 
 /* ---------- rendering ---------- */
-function itemTransform(it){return 'translate('+it.x+' '+it.y+')';}
+const LIGHTS=['warm','white','off'];
+const LIGHT_AR={warm:'وورم',white:'أبيض',off:'مطفي'};
+function lightOf(it,p){return p.light?(it.light||'warm'):'off';}
+/* average colour of the surface around an item, used to dim and tint the studio photo to the room */
+function ambientOf(it,rpx){
+  const a=it._amb;
+  if(a&&Math.abs(a.x-it.x)<6&&Math.abs(a.y-it.y)<6&&Math.abs(a.r-rpx)<4) return a.f;
+  let f=[1,1,1];
+  try{
+    const R=Math.max(10,rpx*1.6),x0=Math.max(0,Math.round(it.x-R)),y0=Math.max(0,Math.round(it.y-R));
+    const w=Math.min(state.W-x0,Math.round(2*R)),h=Math.min(state.H-y0,Math.round(2*R));
+    if(w>2&&h>2){
+      const d=pctx.getImageData(x0,y0,w,h).data;let r=0,g=0,b=0,n=0;
+      for(let i=0;i<d.length;i+=16){r+=d[i];g+=d[i+1];b+=d[i+2];n++;}
+      const ref=232;f=[r/n/ref,g/n/ref,b/n/ref].map(v=>clamp(v,.28,1.06));
+    }
+  }catch(e){}
+  it._amb={x:it.x,y:it.y,r:rpx,f:f};return f;
+}
+function itemMatrix(it){const J=jac(it.x,it.y);return 'matrix('+J.a+' '+J.b+' '+J.c+' '+J.d+' 0 0) rotate('+(it.rot+it.tilt)+')';}
 function itemMarkup(it){
   const p=prod(it.pid);if(!p) return '';
-  const kk=k(),s=sscale(),a=it.rot+it.tilt,hw=Math.max(p.w*kk,44/s),hh=Math.max(p.h*kk,44/s);
-  return '<g class="item" data-id="'+it.id+'" transform="'+itemTransform(it)+'"><g transform="rotate('+a+') scale('+kk+')">'+artFor(p,it.color)+'</g><rect x="'+(-hw/2)+'" y="'+(-hh/2)+'" width="'+hw+'" height="'+hh+'" transform="rotate('+a+')" fill="#000" fill-opacity="0" pointer-events="all"/></g>';
+  const sc=scaleAt(it.x,it.y),s=sscale(),min=44/(s*sc),hw=Math.max(p.w,min),hh=Math.max(p.h,min);
+  const lit=lightOf(it,p),rpx=Math.max(p.w,p.h)/2*sc,f=ambientOf(it,rpx),id=safeId('a'+it.id);
+  const blurMm=.45/sc;
+  const filt='<filter id="'+id+'" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="'+f[0]+' 0 0 0 0 0 '+f[1]+' 0 0 0 0 0 '+f[2]+' 0 0 0 0 0 1 0"/><feGaussianBlur stdDeviation="'+blurMm+'"/></filter>';
+  const edge=p.shape==='round'
+    ?'<ellipse rx="'+p.w*.51+'" ry="'+p.h*.51+'" fill="#000" fill-opacity=".28" filter="url(#fSoft)" transform="translate(0 '+p.h*.012+')"/>'
+    :'<rect x="'+(-p.w*.51)+'" y="'+(-p.h*.51)+'" width="'+p.w*1.02+'" height="'+p.h*1.02+'" fill="#000" fill-opacity=".24" filter="url(#fSoft)"/>';
+  let lens='',bloom='';
+  if(lit!=='off'){
+    const lr=p.w*p.light;
+    lens='<circle r="'+lr*1.2+'" fill="url(#gLens_'+lit+')" style="mix-blend-mode:screen"/>';
+    const br=Math.max(lr*sc*7,8);
+    bloom='<circle r="'+br+'" fill="url(#gBloom_'+lit+')" style="mix-blend-mode:screen" pointer-events="none"/>';
+  }
+  return '<g class="item" data-id="'+it.id+'" transform="translate('+it.x+' '+it.y+')">'+filt+
+    '<g class="mx" transform="'+itemMatrix(it)+'">'+(p.cat==='spot'||p.cat==='panel'?edge:'')+'<g filter="url(#'+id+')">'+artFor(p,it.color)+'</g>'+lens+
+    '<rect x="'+(-hw/2)+'" y="'+(-hh/2)+'" width="'+hw+'" height="'+hh+'" fill="#000" fill-opacity="0" pointer-events="all"/></g>'+bloom+'</g>';
 }
 function renderItems(){
   gItems.innerHTML=state.items.map(itemMarkup).join('');
   countEl.textContent=state.items.length;
 }
 function moveItems(){
-  for(const el of gItems.children){const it=state.items.find(i=>i.id==el.dataset.id);if(it) el.setAttribute('transform',itemTransform(it));}
+  for(const el of gItems.children){
+    const it=state.items.find(i=>i.id==el.dataset.id);if(!it) continue;
+    el.setAttribute('transform','translate('+it.x+' '+it.y+')');
+    const mx=el.querySelector('.mx');if(mx) mx.setAttribute('transform',itemMatrix(it));
+  }
 }
 function label(x,y,t,s){
   const fs=13/s;
@@ -711,7 +829,7 @@ function laser(x1,y1,x2,y2,s){
   return '<line class="lz-glow" '+c+' stroke-width="'+6/s+'"/><line class="lz" '+c+' stroke-width="'+1.5/s+'"/>';
 }
 function renderScale(){
-  if(!state.calibrated){gScale.innerHTML='';return;}
+  if(!state.calibrated||state.cal.kind==='quad'){gScale.innerHTML='';return;}
   const kk=k(),W=state.W,H=state.H;let L=10;
   for(const n of [10,20,50,100,200,500,1000,2000,5000,10000]){if(n*kk<=W*.3) L=n;}
   const len=L*kk,x=W*.035,y=H-W*.035,t=Math.max(6,W*.008),fs=Math.max(14,W*.028);let segs='';
@@ -721,32 +839,52 @@ function renderScale(){
 }
 function renderAdorn(){
   const s=sscale();let o='';const g=state.guides;
-  if(g){if(g.x!=null) o+=laser(g.x,0,g.x,state.H,s);if(g.y!=null) o+=laser(0,g.y,state.W,g.y,s);}
+  if(g) for(const seg of g) o+=laser(seg[0],seg[1],seg[2],seg[3],s);
   const it=selItem(),p=it&&prod(it.pid);
   if(p&&state.mode==='place'){
-    const kk=k(),deg=it.rot+it.tilt,a=deg*Math.PI/180,w=p.w*kk,h=p.h*kk,pad=6/s;
-    const box='x="'+(-w/2-pad)+'" y="'+(-h/2-pad)+'" width="'+(w+2*pad)+'" height="'+(h+2*pad)+'" rx="'+4/s+'"';
-    o+='<g transform="translate('+it.x+' '+it.y+') rotate('+deg+')"><rect class="sel-o" '+box+' stroke-width="'+3.5/s+'"/><rect class="sel-i" '+box+' stroke-width="'+1.6/s+'" stroke-dasharray="'+6/s+' '+4/s+'"/></g>';
+    const J=jac(it.x,it.y),sc=scaleAt(it.x,it.y),pad=6/(s*sc),sw=1/(s*sc);
+    const box='x="'+(-p.w/2-pad)+'" y="'+(-p.h/2-pad)+'" width="'+(p.w+2*pad)+'" height="'+(p.h+2*pad)+'" rx="'+4*sw+'"';
+    o+='<g transform="translate('+it.x+' '+it.y+') '+itemMatrix(it)+'"><rect class="sel-o" '+box+' stroke-width="'+3.5*sw+'"/><rect class="sel-i" '+box+' stroke-width="'+1.6*sw+'" stroke-dasharray="'+6*sw+' '+4*sw+'"/></g>';
     let best=null,bd=Infinity;
-    for(const q of state.items){if(q===it) continue;const d=Math.hypot(q.x-it.x,q.y-it.y);if(d<bd){bd=d;best=q;}}
+    for(const q of state.items){if(q===it) continue;const d=planeDist(it,q);if(d<bd){bd=d;best=q;}}
     if(best){
       const c='x1="'+it.x+'" y1="'+it.y+'" x2="'+best.x+'" y2="'+best.y+'"';
       o+='<line '+c+' stroke="#15181d" stroke-opacity=".7" stroke-width="'+4/s+'"/><line '+c+' stroke="#fff" stroke-width="'+1.5/s+'" stroke-dasharray="'+6/s+' '+4/s+'"/>';
-      o+=label((it.x+best.x)/2,(it.y+best.y)/2-8/s,fmtLen(bd/kk),s);
+      o+=label((it.x+best.x)/2,(it.y+best.y)/2-8/s,fmtLen(bd),s);
     }
-    const hy=(Math.abs(w*Math.sin(a))+Math.abs(h*Math.cos(a)))/2;
-    o+=label(it.x,it.y-hy-pad-8/s,dimText(p),s);
+    const a=(it.rot+it.tilt)*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);let top=0;
+    for(const [lx,ly] of [[-1,-1],[1,-1],[1,1],[-1,1]]){const x=lx*p.w/2*ca-ly*p.h/2*sa,y=lx*p.w/2*sa+ly*p.h/2*ca;top=Math.min(top,J.b*x+J.d*y);}
+    o+=label(it.x,it.y+top-14/s,dimText(p),s);
   }
   gAdorn.innerHTML=o;
 }
-function handle(id,x,y,s){
+function handle(id,x,y,s,num){
   const r=15/s;
-  return '<g class="handle" data-h="'+id+'" transform="translate('+x+' '+y+')"><circle r="'+30/s+'" fill="#000" fill-opacity="0" pointer-events="all"/><circle class="h-ring" r="'+r+'" stroke-width="'+2/s+'"/><line class="lz" x1="'+(-r*1.6)+'" y1="0" x2="'+(r*1.6)+'" y2="0" stroke-width="'+1.2/s+'"/><line class="lz" x1="0" y1="'+(-r*1.6)+'" x2="0" y2="'+(r*1.6)+'" stroke-width="'+1.2/s+'"/><circle class="h-dot" r="'+2.4/s+'"/></g>';
+  return '<g class="handle" data-h="'+id+'" transform="translate('+x+' '+y+')"><circle r="'+30/s+'" fill="#000" fill-opacity="0" pointer-events="all"/><circle class="h-ring" r="'+r+'" stroke-width="'+2/s+'"/><line class="lz" x1="'+(-r*1.6)+'" y1="0" x2="'+(r*1.6)+'" y2="0" stroke-width="'+1.2/s+'"/><line class="lz" x1="0" y1="'+(-r*1.6)+'" x2="0" y2="'+(r*1.6)+'" stroke-width="'+1.2/s+'"/><circle class="h-dot" r="'+2.4/s+'"/>'+
+    (num?'<text x="'+r*1.25+'" y="'+(-r*1.25)+'" font-size="'+14/s+'" font-family="Changa, Tahoma, sans-serif" font-weight="700" fill="#fff" stroke="#15181d" stroke-width="'+3/s+'" paint-order="stroke" pointer-events="none">'+num+'</text>':'')+'</g>';
 }
 function renderCal(){
   if(state.mode!=='cal'){gCal.innerHTML='';return;}
-  const c=state.cal,s=sscale();
-  gCal.innerHTML=laser(c.ax,c.ay,c.bx,c.by,s)+handle('a',c.ax,c.ay,s)+handle('b',c.bx,c.by,s)+label((c.ax+c.bx)/2,(c.ay+c.by)/2-22/s,num(c.mm/10,2)+' سم',s);
+  const c=state.cal,s=sscale();let o='';
+  if(c.kind==='quad'){
+    const q=c.q,H=quadH(c);
+    if(H&&c.wmm>0&&c.hmm>0){
+      // a perspective grid on the surface: each line is a fixed distance apart, so its spacing should look right
+      let step=100;for(const st of [100,200,500,1000,2000]){step=st;if(Math.max(c.wmm,c.hmm)/st<=12) break;}
+      let gl='';
+      for(let u=step;u<c.wmm-1;u+=step){const a=mapH(H,u,0),b=mapH(H,u,c.hmm);gl+='<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'"/>';}
+      for(let v=step;v<c.hmm-1;v+=step){const a=mapH(H,0,v),b=mapH(H,c.wmm,v);gl+='<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'"/>';}
+      o+='<g stroke="#fff" stroke-opacity=".7" stroke-width="'+1.2/s+'" pointer-events="none">'+gl+'</g>';
+      o+=label((q[0].x+q[1].x)/2,(q[0].y+q[1].y)/2-12/s,'العرض '+num(c.wmm/10)+' سم',s);
+      o+=label((q[1].x+q[2].x)/2+4/s,(q[1].y+q[2].y)/2,'الطول '+num(c.hmm/10)+' سم',s);
+      o+=label((q[0].x+q[2].x)/2,(q[0].y+q[2].y)/2+20/s,'الخطوط كل '+fmtLen(step),s);
+    }
+    for(let i=0;i<4;i++){const a=q[i],b=q[(i+1)%4];o+=laser(a.x,a.y,b.x,b.y,s);}
+    for(let i=0;i<4;i++) o+=handle('q'+i,q[i].x,q[i].y,s,String(i+1));
+  }else{
+    o+=laser(c.ax,c.ay,c.bx,c.by,s)+handle('a',c.ax,c.ay,s)+handle('b',c.bx,c.by,s)+label((c.ax+c.bx)/2,(c.ay+c.by)/2-22/s,num(c.mm/10,2)+' سم',s);
+  }
+  gCal.innerHTML=o;
 }
 function thumbBox(p){const pad=Math.max(p.w,p.h)*.12;return (-p.w/2-pad)+' '+(-p.h/2-pad)+' '+(p.w+2*pad)+' '+(p.h+2*pad);}
 function thumb(p,ci){return '<svg viewBox="'+thumbBox(p)+'" aria-hidden="true">'+artFor(p,ci)+'</svg>';}
@@ -769,11 +907,14 @@ function renderSelbar(){
     selName.textContent=p.name;selDims.textContent=(c?c.ar+' · ':'')+dimText(p)+(p.approx?' · تقريبي':'');
     tilt.value=it.tilt;tiltOut.textContent=num(it.tilt)+'°';actGrid.textContent=it.gid?'فك الشبكة':'شبكة';
     actColor.disabled=!(p.colors&&p.colors.length>1&&!p.img);
-  }else{selName.textContent='دوس على منتج في الصورة';selDims.textContent='عشان تحركه أو تلفه';tilt.value=0;tiltOut.textContent='0°';actGrid.textContent='شبكة';}
+    actLight.disabled=!p.light;actLight.textContent=p.light?'نور: '+LIGHT_AR[lightOf(it,p)]:'النور';
+  }else{actLight.textContent='النور';selName.textContent='دوس على منتج في الصورة';selDims.textContent='عشان تحركه أو تلفه';tilt.value=0;tiltOut.textContent='0°';actGrid.textContent='شبكة';}
 }
 function renderBadges(){
   demoTag.hidden=!state.demo;
-  refTag.textContent=state.mode==='cal'?'حرّك العلامتين على طرفين المرجع':'المقاس مظبوط على مرجع '+num(state.cal.mm/10,2)+' سم';
+  const c=state.cal;
+  refTag.textContent=state.mode==='cal'?(c.kind==='quad'?'حرّك النقط الـ 4 على أركان المستطيل':'حرّك العلامتين على طرفين المرجع')
+    :(c.kind==='quad'?'المنظور مظبوط على مستطيل '+num(c.wmm/10)+' × '+num(c.hmm/10)+' سم':'المقاس مظبوط على مرجع '+num(c.mm/10,2)+' سم');
 }
 function syncChips(){
   const v=parseFloat(refCm.value);
@@ -783,7 +924,8 @@ function setMode(m){
   state.mode=m;
   placeUI.hidden=m!=='place';calUI.hidden=m!=='cal';btnCal.hidden=m==='cal';
   btnSave.hidden=m==='cal'||!downloads;
-  if(m==='cal'){refCm.value=num(state.cal.mm/10,2);syncChips();calCancel.hidden=!state.calBackup;}
+  $('#btnLive').classList.toggle('calhide',m==='cal');
+  if(m==='cal'){refCm.value=num(state.cal.mm/10,2);syncChips();calCancel.hidden=!state.calBackup;syncCalKind();}
   $('#surfCeiling').setAttribute('aria-pressed',String(state.surface==='ceiling'));
   $('#surfWall').setAttribute('aria-pressed',String(state.surface==='wall'));
   renderBadges();renderCats();renderTray();renderSelbar();layout();
@@ -796,14 +938,16 @@ function toast(t){toastEl.textContent=t;toastEl.classList.add('on');clearTimeout
 function addItem(pid){
   if(!state.calibrated){toast('ظبّط المقاس الأول.');return;}
   const r=stage.getBoundingClientRect(),c=toImg(r.left+r.width/2,r.top+r.height/2),o=(state.items.length%5)*14/sscale();
-  const it={id:uid++,pid:pid,color:state.lastColor[pid]||0,x:clamp(c.x+o,0,state.W),y:clamp(c.y+o,0,state.H),rot:0,tilt:0,gid:null};
+  const p=prod(pid);
+  const it={id:uid++,pid:pid,color:state.lastColor[pid]||0,light:p&&p.light?state.lastLight:'off',x:clamp(c.x+o,0,state.W),y:clamp(c.y+o,0,state.H),rot:0,tilt:0,gid:null};
   state.items.push(it);renderItems();select(it.id);
 }
 actRot.addEventListener('click',()=>{const it=selItem();if(!it) return;it.rot=(it.rot+90)%360;renderItems();renderAdorn();});
 actDup.addEventListener('click',()=>{
   const it=selItem(),p=it&&prod(it.pid);if(!p) return;
-  const d=Math.max(p.w*k()*1.2,36/sscale());let x=it.x+d;if(x>state.W) x=it.x-d;
-  const n={id:uid++,pid:it.pid,color:it.color||0,x:clamp(x,0,state.W),y:it.y,rot:it.rot,tilt:it.tilt,gid:null};
+  const q=toPlane(it.x,it.y),d=Math.max(p.w*1.3,40/(sscale()*scaleAt(it.x,it.y)));
+  let t=toImgPt(q.u+d,q.v);if(!(t.w>0)||t.x>state.W) t=toImgPt(q.u-d,q.v);
+  const n={id:uid++,pid:it.pid,color:it.color||0,light:it.light,x:clamp(t.x,0,state.W),y:clamp(t.y,0,state.H),rot:it.rot,tilt:it.tilt,gid:null};
   state.items.push(n);renderItems();select(n.id);
 });
 actDel.addEventListener('click',()=>{const it=selItem();if(!it) return;state.items=state.items.filter(i=>i!==it);renderItems();select(null);});
@@ -815,15 +959,24 @@ actGrid.addEventListener('click',()=>{
 $('#gridOk').addEventListener('click',()=>{
   const base=selItem();if(!base){sheetGrid.hidden=true;return;}
   const cols=clamp(parseInt($('#gCols').value,10)||1,1,12),rows=clamp(parseInt($('#gRows').value,10)||1,1,12);
-  const dx=clamp(parseFloat($('#gDx').value)||100,1,1000)*10*k(),dy=clamp(parseFloat($('#gDy').value)||100,1,1000)*10*k();
-  const a=base.tilt*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a),gid='g'+(uid++),made=[];
+  const dx=clamp(parseFloat($('#gDx').value)||100,1,1000)*10,dy=clamp(parseFloat($('#gDy').value)||100,1,1000)*10;
+  const a=base.tilt*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a),gid='g'+(uid++),made=[],q0=toPlane(base.x,base.y);
   for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
-    const ux=(c-(cols-1)/2)*dx,uy=(r-(rows-1)/2)*dy;
-    made.push({id:uid++,pid:base.pid,color:base.color||0,x:base.x+ux*ca-uy*sa,y:base.y+ux*sa+uy*ca,rot:base.rot,tilt:base.tilt,gid:cols*rows>1?gid:null});
+    const ux=(c-(cols-1)/2)*dx,uy=(r-(rows-1)/2)*dy,t=toImgPt(q0.u+ux*ca-uy*sa,q0.v+ux*sa+uy*ca);
+    if(!(t.w>0)) continue;
+    made.push({id:uid++,pid:base.pid,color:base.color||0,light:base.light,x:t.x,y:t.y,rot:base.rot,tilt:base.tilt,gid:cols*rows>1?gid:null});
   }
+  if(!made.length){sheetGrid.hidden=true;return;}
   state.items=state.items.filter(i=>i!==base).concat(made);
   sheetGrid.hidden=true;renderItems();select(made[0].id);
   if(made.length>1) toast('اسحب أي قطعة والشبكة كلها هتتحرك معاها.');
+});
+actLight.addEventListener('click',()=>{
+  const it=selItem(),p=it&&prod(it.pid);if(!p||!p.light) return;
+  const next=LIGHTS[(LIGHTS.indexOf(lightOf(it,p))+1)%LIGHTS.length];
+  for(const q of state.items) if(q===it||(it.gid&&q.gid===it.gid)) q.light=next;
+  state.lastLight=next;renderItems();renderSelbar();
+  toast(next==='off'?'النور مطفي.':'النور '+LIGHT_AR[next]+'.');
 });
 tilt.addEventListener('input',()=>{const it=selItem();if(!it) return;it.tilt=parseFloat(tilt.value)||0;tiltOut.textContent=num(it.tilt)+'°';renderItems();renderAdorn();});
 catsEl.addEventListener('click',e=>{const c=e.target.closest('[data-cat]');if(!c) return;state.cat=c.dataset.cat;renderCats();renderTray();});
@@ -874,19 +1027,62 @@ $('#qtyCopy').addEventListener('click',()=>{
 $('#qtyClear').addEventListener('click',()=>{state.items=[];sheetQty.hidden=true;renderItems();select(null);});
 
 /* ---------- calibration ---------- */
-btnCal.addEventListener('click',()=>{state.calBackup={cal:Object.assign({},state.cal),calibrated:state.calibrated};state.sel=null;setMode('cal');});
-refCm.addEventListener('input',()=>{const v=parseFloat(refCm.value);if(v>0){state.cal.mm=v*10;renderItems();renderCal();}syncChips();});
-refChips.addEventListener('click',e=>{const c=e.target.closest('.chip');if(!c) return;refCm.value=c.dataset.cm;state.cal.mm=parseFloat(c.dataset.cm)*10;syncChips();renderItems();renderCal();});
+const refW=$('#refW'),refH=$('#refH'),quadChips=$('#quadChips');
+function syncCalKind(){
+  const quad=state.cal.kind==='quad';
+  $('#calKindQuad').setAttribute('aria-pressed',String(quad));$('#calKindLine').setAttribute('aria-pressed',String(!quad));
+  $('#quadFields').hidden=!quad;$('#lineFields').hidden=quad;
+  if(quad){refW.value=num(state.cal.wmm/10);refH.value=num(state.cal.hmm/10);}
+  for(const c of quadChips.children) c.setAttribute('aria-pressed',String(quad&&parseFloat(c.dataset.w)*10===state.cal.wmm&&parseFloat(c.dataset.h)*10===state.cal.hmm));
+  renderBadges();
+}
+function defaultQuad(){
+  const W=state.W,H=state.H;
+  return [{x:W*.3,y:H*.35},{x:W*.7,y:H*.35},{x:W*.7,y:H*.65},{x:W*.3,y:H*.65}];
+}
+function calChanged(){Hc.key='';for(const it of state.items) it._amb=null;renderItems();renderCal();renderAdorn();}
+$('#calKindQuad').addEventListener('click',()=>{const c=state.cal;c.kind='quad';if(!c.q) c.q=defaultQuad();if(!(c.wmm>0)){c.wmm=600;c.hmm=600;}syncCalKind();calChanged();});
+$('#calKindLine').addEventListener('click',()=>{state.cal.kind='line';syncCalKind();calChanged();});
+for(const inp of [refW,refH]) inp.addEventListener('input',()=>{
+  const w=parseFloat(refW.value),h=parseFloat(refH.value);
+  if(w>0) state.cal.wmm=w*10;if(h>0) state.cal.hmm=h*10;
+  for(const c of quadChips.children) c.setAttribute('aria-pressed','false');
+  calChanged();
+});
+quadChips.addEventListener('click',e=>{
+  const c=e.target.closest('.chip');if(!c) return;
+  state.cal.wmm=parseFloat(c.dataset.w)*10;state.cal.hmm=parseFloat(c.dataset.h)*10;syncCalKind();calChanged();
+});
+btnCal.addEventListener('click',()=>{state.calBackup={cal:JSON.parse(JSON.stringify(state.cal)),calibrated:state.calibrated};state.sel=null;setMode('cal');});
+refCm.addEventListener('input',()=>{const v=parseFloat(refCm.value);if(v>0){state.cal.mm=v*10;calChanged();}syncChips();});
+refChips.addEventListener('click',e=>{const c=e.target.closest('.chip');if(!c) return;refCm.value=c.dataset.cm;state.cal.mm=parseFloat(c.dataset.cm)*10;syncChips();calChanged();});
+function convex(q){
+  let sign=0;
+  for(let i=0;i<4;i++){
+    const a=q[i],b=q[(i+1)%4],c=q[(i+2)%4],z=(b.x-a.x)*(c.y-b.y)-(b.y-a.y)*(c.x-b.x);
+    if(Math.abs(z)<1e-6) return false;
+    if(!sign) sign=Math.sign(z);else if(Math.sign(z)!==sign) return false;
+  }
+  return true;
+}
 calOk.addEventListener('click',()=>{
-  const v=parseFloat(refCm.value),c=state.cal;
-  if(!(v>0)){toast('اكتب طول المرجع بالسنتيمتر.');return;}
-  if(Math.hypot(c.bx-c.ax,c.by-c.ay)<24){toast('العلامتين قريبين أوي من بعض. حطهم على طرفين المرجع.');return;}
-  c.mm=v*10;state.lastCm=v;state.calibrated=true;state.calBackup=null;setMode('place');
+  const c=state.cal;
+  if(c.kind==='quad'){
+    if(!(c.wmm>0&&c.hmm>0)){toast('اكتب عرض وطول المستطيل بالسنتيمتر.');return;}
+    if(!convex(c.q)){toast('النقط متلخبطة. رتّبها 1 و2 و3 و4 حوالين المستطيل من غير ما الخطوط تتقاطع.');return;}
+    if(!quadH(c)){toast('النقط قريبة أوي من بعض. وسّعها على أركان المستطيل.');return;}
+  }else{
+    const v=parseFloat(refCm.value);
+    if(!(v>0)){toast('اكتب طول المرجع بالسنتيمتر.');return;}
+    if(Math.hypot(c.bx-c.ax,c.by-c.ay)<24){toast('العلامتين قريبين أوي من بعض. حطهم على طرفين المرجع.');return;}
+    c.mm=v*10;state.lastCm=v;
+  }
+  state.calibrated=true;state.calBackup=null;calChanged();setMode('place');
   if(!state.items.length) toast('المقاس اتظبط. اختار منتج من تحت.');
 });
 calCancel.addEventListener('click',()=>{
   const b=state.calBackup;if(!b) return;
-  state.cal=b.cal;state.calibrated=b.calibrated;state.calBackup=null;setMode('place');
+  state.cal=b.cal;state.calibrated=b.calibrated;state.calBackup=null;calChanged();setMode('place');
 });
 
 /* ---------- surface, photo inputs, zoom ---------- */
@@ -920,14 +1116,15 @@ stage.addEventListener('pointerdown',e=>{
   const h=e.target.closest('.handle'),el=e.target.closest('.item');
   if(state.mode==='cal'&&h&&!ptrs.size){
     e.preventDefault();drag={type:'h',id:h.dataset.h,pid:e.pointerId};
-    const c=state.cal;drawLoupe(drag.id==='a'?c.ax:c.bx,drag.id==='a'?c.ay:c.by,e);return;
+    const c=state.cal,hp=drag.id[0]==='q'?c.q[+drag.id[1]]:(drag.id==='a'?{x:c.ax,y:c.ay}:{x:c.bx,y:c.by});drawLoupe(hp.x,hp.y,e);return;
   }
   if(state.mode==='place'&&el&&!ptrs.size){
     const it=state.items.find(i=>i.id==el.dataset.id);
     if(it){
       e.preventDefault();select(it.id);const p=toImg(e.clientX,e.clientY);
+      const q0=toPlane(it.x,it.y);
       drag={type:'item',pid:e.pointerId,it:it,ox:it.x-p.x,oy:it.y-p.y,
-        group:it.gid?state.items.filter(q=>q.gid===it.gid&&q!==it).map(q=>({q:q,dx:q.x-it.x,dy:q.y-it.y})):[]};
+        group:it.gid?state.items.filter(q=>q.gid===it.gid&&q!==it).map(q=>{const t=toPlane(q.x,q.y);return {q:q,du:t.u-q0.u,dv:t.v-q0.v};}):[]};
       return;
     }
   }
@@ -941,18 +1138,25 @@ window.addEventListener('pointermove',e=>{
     const p=toImg(e.clientX,e.clientY);
     if(drag.type==='h'){
       const c=state.cal,x=clamp(p.x,0,state.W),y=clamp(p.y,0,state.H);
-      if(drag.id==='a'){c.ax=x;c.ay=y;}else{c.bx=x;c.by=y;}
-      renderItems();renderCal();drawLoupe(x,y,e);return;
+      if(drag.id[0]==='q'){c.q[+drag.id[1]]={x:x,y:y};}
+      else if(drag.id==='a'){c.ax=x;c.ay=y;}else{c.bx=x;c.by=y;}
+      Hc.key='';moveItems();renderCal();drawLoupe(x,y,e);return;
     }
-    let x=p.x+drag.ox,y=p.y+drag.oy,gx=null,gy=null;const th=7/sscale(),me=drag.it;
+    const me=drag.it;let x=clamp(p.x+drag.ox,0,state.W),y=clamp(p.y+drag.oy,0,state.H);
+    // snap on the surface: same row or same column in real millimetres, even in a tilted photo
+    let pl=toPlane(x,y);const th=8/(sscale()*scaleAt(x,y)),segs=[];let su=null,sv=null;
     for(const q of state.items){
       if(q===me||(me.gid&&q.gid===me.gid)) continue;
-      if(gx==null&&Math.abs(q.x-x)<th){x=q.x;gx=q.x;}
-      if(gy==null&&Math.abs(q.y-y)<th){y=q.y;gy=q.y;}
+      const t=toPlane(q.x,q.y);
+      if(su==null&&Math.abs(t.u-pl.u)<th){su=t;pl.u=t.u;}
+      if(sv==null&&Math.abs(t.v-pl.v)<th){sv=t;pl.v=t.v;}
     }
-    x=clamp(x,0,state.W);y=clamp(y,0,state.H);me.x=x;me.y=y;
-    for(const m of drag.group){m.q.x=x+m.dx;m.q.y=y+m.dy;}
-    state.guides=gx!=null||gy!=null?{x:gx,y:gy}:null;
+    const m2=toImgPt(pl.u,pl.v);if(m2.w>0){x=m2.x;y=m2.y;}
+    if(su){const a=toImgPt(su.u,su.v);segs.push([a.x,a.y,x,y]);}
+    if(sv){const a=toImgPt(sv.u,sv.v);segs.push([a.x,a.y,x,y]);}
+    me.x=x;me.y=y;
+    for(const m of drag.group){const t=toImgPt(pl.u+m.du,pl.v+m.dv);if(t.w>0){m.q.x=t.x;m.q.y=t.y;}}
+    state.guides=segs.length?segs:null;
     moveItems();renderAdorn();return;
   }
   const pt=ptrs.get(e.pointerId);if(!pt) return;
@@ -968,7 +1172,7 @@ window.addEventListener('pointermove',e=>{
 function pointerEnd(e){
   if(drag&&e.pointerId===drag.pid){
     const t=drag.type;drag=null;state.guides=null;loupe.hidden=true;
-    if(t==='h') renderCal();else renderAdorn();
+    if(t==='h'){renderCal();renderItems();}else{renderItems();renderAdorn();}
     return;
   }
   if(!ptrs.has(e.pointerId)) return;
@@ -1132,7 +1336,7 @@ async function composeBlob(){
     if(extra>0){y+=lh;c.fillText('و'+extra+' صنف كمان في القائمة',W-pad,y);}
     y+=Math.round(fs*1.6);
     c.fillStyle='#56606b';c.font='400 '+Math.round(fs*.8)+'px "IBM Plex Sans Arabic", Tahoma, sans-serif';
-    c.fillText('معاينة بمقياس محسوب على مرجع '+num(state.cal.mm/10,2)+' سم',W-pad,y);
+    c.fillText(state.cal.kind==='quad'?'المقاس والمنظور محسوبين على مستطيل '+num(state.cal.wmm/10)+' × '+num(state.cal.hmm/10)+' سم':'معاينة بمقياس محسوب على مرجع '+num(state.cal.mm/10,2)+' سم',W-pad,y);
     if(logoEl&&logoEl.naturalHeight){
       const lhh=Math.min(bandH-2*pad,W*.09),lw=Math.min(W*.28,lhh*logoEl.naturalWidth/logoEl.naturalHeight);
       c.drawImage(logoEl,pad,H+pad,lw,lw*logoEl.naturalHeight/logoEl.naturalWidth);
@@ -1195,10 +1399,10 @@ async function startLive(){
       const vs=[];
       if(p.colors&&!p.img){for(let i=0;i<p.colors.length;i++) vs.push({label:p.colors[i].ar,png:await productPng(p,i)});}
       else vs.push({label:'',png:await productPng(p,0)});
-      out.push({id:p.id,name:p.name,w:p.w,h:p.h,variant:state.lastColor[p.id]||0,variants:vs});
+      out.push({id:p.id,name:p.name,w:p.w,h:p.h,variant:state.lastColor[p.id]||0,light:p.light||0,variants:vs});
     }
     const it=selItem(),start=it?it.pid:(list.find(p=>p.cat===state.cat)||list[0]).id;
-    APP.startAr(JSON.stringify({products:out,start:start}));
+    APP.startAr(JSON.stringify({products:out,start:start,light:state.lastLight}));
   }catch(e){toast('الكاميرا اللايف ما اشتغلتش. جرّب تاني.');}
   finally{btn.disabled=false;}
 }
