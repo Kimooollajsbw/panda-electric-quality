@@ -32,6 +32,8 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Camera
@@ -127,6 +129,9 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
     private val bgTexIn: FloatBuffer = GlUtil.floats(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f)
     private val bgTex: FloatBuffer = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
     private val quadUv: FloatBuffer = GlUtil.floats(0f, 0f, 1f, 0f, 0f, 1f, 1f, 1f)
+    private val quadBuf: FloatBuffer = ByteBuffer.allocateDirect(12 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+    private fun quad(vararg v: Float): FloatBuffer { quadBuf.clear(); quadBuf.put(v); quadBuf.position(0); return quadBuf }
+    private val dotBuf = FloatArray(3000)
     private var scratch: FloatBuffer = ByteBuffer.allocateDirect(4096 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
 
     // ---------- views ----------
@@ -268,6 +273,14 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         scroller.addView(strip)
         bottom.addView(scroller)
         root.addView(bottom, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
+        // keep the hint and the buttons clear of the status and navigation bars
+        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
+            val b = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            (hint.layoutParams as FrameLayout.LayoutParams).topMargin = dp(16f).toInt() + b.top
+            hint.requestLayout()
+            bottom.setPadding(0, dp(8f).toInt(), 0, dp(10f).toInt() + b.bottom)
+            insets
+        }
         setContentView(root)
         renderStrip()
 
@@ -357,7 +370,8 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         val next = ((variantOf[p.id] ?: 0) + 1) % p.variants.size
         variantOf[p.id] = next
         glQueue.add {
-            for (it in items) if (it.product === p && (selected == null || it === selected || it.product === selected?.product)) it.variant = next
+            val sel = selected
+            if (sel != null && sel.product === p) sel.variant = next
         }
         renderStrip()
     }
@@ -613,18 +627,18 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
             GLES20.glLineWidth(3f)
             drawColor(model, loop, n, GLES20.GL_LINE_LOOP, 0.85f, 0.12f, 0.16f, 0.75f)
             // a 10 cm dot grid so the scale of the surface reads at a glance
-            val dots = ArrayList<Float>()
+            var dn = 0
             val ext = max(p.extentX, p.extentZ) / 2f
             var gx = -ext
-            while (gx <= ext && dots.size < 3000) {
+            while (gx <= ext && dn + 3 <= dotBuf.size) {
                 var gz = -ext
-                while (gz <= ext && dots.size < 3000) {
-                    if (insidePoly(poly, n, gx, gz)) { dots.add(gx); dots.add(0f); dots.add(gz) }
+                while (gz <= ext && dn + 3 <= dotBuf.size) {
+                    if (insidePoly(poly, n, gx, gz)) { dotBuf[dn] = gx; dotBuf[dn + 1] = 0f; dotBuf[dn + 2] = gz; dn += 3 }
                     gz += 0.1f
                 }
                 gx += 0.1f
             }
-            if (dots.isNotEmpty()) drawColor(model, dots.toFloatArray(), dots.size / 3, GLES20.GL_POINTS, 1f, 1f, 1f, 0.55f)
+            if (dn > 0) drawColor(model, dotBuf, dn / 3, GLES20.GL_POINTS, 1f, 1f, 1f, 0.55f)
         }
     }
 
@@ -704,7 +718,7 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tex)
             GLES20.glUniform1i(GLES20.glGetUniformLocation(texProg, "u_Tex"), 0)
             GLES20.glUniform3f(GLES20.glGetUniformLocation(texProg, "u_Mul"), ambient[0], ambient[1], ambient[2])
-            val pos = GlUtil.floats(-hw, hh, 0f, hw, hh, 0f, -hw, -hh, 0f, hw, -hh, 0f)
+            val pos = quad(-hw, hh, 0f, hw, hh, 0f, -hw, -hh, 0f, hw, -hh, 0f)
             quadUv.position(0)
             val aPos = GLES20.glGetAttribLocation(texProg, "a_Pos")
             val aUv = GLES20.glGetAttribLocation(texProg, "a_Uv")
@@ -737,7 +751,7 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         val aUv = GLES20.glGetAttribLocation(glowProg, "a_Uv")
         fun pass(radius: Float, sharp: Float, gain: Float, c: FloatArray) {
             val r = radius
-            val pos = GlUtil.floats(-r, r, 0.001f, r, r, 0.001f, -r, -r, 0.001f, r, -r, 0.001f)
+            val pos = quad(-r, r, 0.001f, r, r, 0.001f, -r, -r, 0.001f, r, -r, 0.001f)
             quadUv.position(0)
             GLES20.glUniform3f(GLES20.glGetUniformLocation(glowProg, "u_Color"), c[0], c[1], c[2])
             GLES20.glUniform1f(GLES20.glGetUniformLocation(glowProg, "u_Sharp"), sharp)
@@ -821,7 +835,10 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
 
     private fun onDown(x: Float, y: Float) {
         dragging = itemAt(x, y)
-        if (dragging != null) selected = dragging
+        val hit = dragging ?: return
+        selected = hit
+        val idx = products.indexOf(hit.product)
+        if (idx >= 0 && idx != current) runOnUiThread { current = idx; renderStrip() }
     }
 
     private fun onMove(x: Float, y: Float) {
@@ -928,6 +945,7 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
                 buf.position(0)
                 val raw = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
                 raw.copyPixelsFromBuffer(buf)
+                raw.setHasAlpha(false)
                 val flip = GMatrix().apply { preScale(1f, -1f) }
                 val shot = Bitmap.createBitmap(raw, 0, 0, w, h, flip, false)
                 raw.recycle()
