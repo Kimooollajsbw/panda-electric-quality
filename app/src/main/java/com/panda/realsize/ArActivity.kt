@@ -723,7 +723,7 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
         for (hit in frame.hitTest(x, y)) {
             val tr = hit.trackable
             val ok = when (tr) {
-                is Plane -> tr.isPoseInPolygon(hit.hitPose) && Plane.calculateDistanceToPlane(hit.hitPose, frame.camera.pose) > 0
+                is Plane -> tr.isPoseInPolygon(hit.hitPose) && cameraInFront(hit, frame)
                 is DepthPoint -> true
                 is Point -> tr.orientationMode == Point.OrientationMode.ESTIMATED_SURFACE_NORMAL
                 else -> false
@@ -731,6 +731,14 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
             if (ok) return hit
         }
         return null
+    }
+
+    /** True when the phone is on the side of the surface its normal points to (in front of the wall, under the ceiling). */
+    private fun cameraInFront(hit: HitResult, frame: Frame): Boolean {
+        val n = hit.hitPose.yAxis
+        val t = hit.hitPose.translation
+        val c = frame.camera.pose.translation
+        return (c[0] - t[0]) * n[0] + (c[1] - t[1]) * n[1] + (c[2] - t[2]) * n[2] > 0f
     }
 
     private var lastFrame: Frame? = null
