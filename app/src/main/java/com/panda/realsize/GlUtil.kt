@@ -10,9 +10,7 @@ import java.nio.FloatBuffer
 
 /** Small OpenGL ES 2.0 helpers: shader programs and buffers. */
 object GlUtil {
-    fun floats(vararg v: Float): FloatBuffer = floats(v)
-
-    fun floats(v: FloatArray): FloatBuffer =
+    fun floats(vararg v: Float): FloatBuffer =
         ByteBuffer.allocateDirect(v.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().apply {
             put(v); position(0)
         }
