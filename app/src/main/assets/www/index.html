@@ -312,8 +312,10 @@ button:disabled{opacity:.45;cursor:default}
       <label class="field" for="pH" id="pHField" hidden><span>الارتفاع (مم)</span><input id="pH" type="number" inputmode="decimal" min="5" max="5000"></label>
     </div>
     <div class="row">
+      <input class="vh" type="file" id="fileProdCam" accept="image/*" capture="environment">
+      <label class="btn" for="fileProdCam">صوّر المنتج</label>
       <input class="vh" type="file" id="fileProd" accept="image/*">
-      <label class="btn" for="fileProd">صورة المنتج</label>
+      <label class="btn" for="fileProd">من الصور</label>
       <button type="button" class="linkbtn" id="pImgDel" hidden>شيل الصورة</button>
       <span class="note" id="pNote"></span>
     </div>
@@ -385,6 +387,10 @@ const pair=(a,b)=>({en:a+' * '+b,ar:TONE[a][1]+' × '+TONE[b][1],c:[TONE[a][0],T
 const one=a=>({en:a,ar:TONE[a][1],c:[TONE[a][0],TONE[a][0]]});
 const FRAME12=[['White','White'],['Black','Black'],['White','Black'],['Black','White'],['Champagne','Gold'],['White','Gold'],['Black','Gold'],['Silver','Silver'],['White','Silver'],['Black','Silver'],['Champagne','Silver'],['Beige','Gold']].map(x=>pair(x[0],x[1]));
 const ROUND_COLORS=FRAME12.concat([pair('Pearl','Gold')]);
+const withFile=(prefix,list)=>list.map(x=>Object.assign(pair(x[0],x[1]),{file:prefix+'__'+x[0]+'_'+x[1]}));
+const ROUND_REAL=withFile('sp-round',[['White','White'],['Black','Black'],['Black','Gold'],['Champagne','Gold'],['White','Gold'],['Pearl','Gold']]);
+const SQUARE_REAL=withFile('sp-square',[['White','Gold'],['White','Silver'],['Black','Black'],['Black','Gold'],['Champagne','Gold'],['Silver','Silver']]);
+const ANTI_REAL=withFile('sp-anti',[['Black','Black']]);
 const HOLDER_COLORS=['White','Beige','Brown','Shiny Silver','Shiny Gold'].map(one);
 
 /* ---------- product artwork, drawn in millimetres around (0,0) ---------- */
@@ -447,10 +453,21 @@ const A={
 function imgArt(p){
   const id='cp-'+safeId(p.id);
   const clip=p.shape==='round'?'<ellipse rx="'+p.w/2+'" ry="'+p.h/2+'"/>':'<rect x="'+(-p.w/2)+'" y="'+(-p.h/2)+'" width="'+p.w+'" height="'+p.h+'" rx="'+Math.min(p.w,p.h)*.05+'"/>';
-  return '<clipPath id="'+id+'">'+clip+'</clipPath><image href="'+p.img+'" x="'+(-p.w/2)+'" y="'+(-p.h/2)+'" width="'+p.w+'" height="'+p.h+'" preserveAspectRatio="xMidYMid slice" clip-path="url(#'+id+')"/>';
+  return '<clipPath id="'+id+'">'+clip+'</clipPath><image href="'+p.img+'" x="'+(-p.w/2)+'" y="'+(-p.h/2)+'" width="'+p.w+'" height="'+p.h+'" preserveAspectRatio="xMidYMid meet" clip-path="url(#'+id+')"/>';
+}
+/* Real product photos, bundled with the app and turned into data URLs so they also survive
+   being drawn into a saved picture or handed to the live camera. */
+const PH={};
+const PHOTO_FILES=['logo.png'];
+function photoKey(p,ci){if(p.colors){const c=p.colors[ci||0]||p.colors[0];return c&&c.file;}return p.photo;}
+function photoArt(p,url){
+  const lift=p.cat==='spot'||p.cat==='panel'?'':' filter="url(#fShadow)"';
+  return '<image href="'+url+'" x="'+(-p.w/2)+'" y="'+(-p.h/2)+'" width="'+p.w+'" height="'+p.h+'" preserveAspectRatio="none"'+lift+'/>';
 }
 function artFor(p,ci){
   if(p.img) return imgArt(p);
+  const key=photoKey(p,ci);
+  if(key&&PH[key]) return photoArt(p,PH[key]);
   if(!p.draw) return p.shape==='round'?A.genericRound(p.w,p.h):A.genericRect(p.w,p.h);
   return p.draw(p,p.colors?(p.colors[ci||0]||p.colors[0]):null);
 }
@@ -459,35 +476,28 @@ function artFor(p,ci){
    Names, categories and colours of the Panda items come from panda-electric.com.
    That site lists no dimensions, so every size here is a typical one, flagged approximate
    until someone measures the product and saves the real size. */
-const CATS=[{id:'spot',name:'سبوت'},{id:'panel',name:'بانل'},{id:'track',name:'ماجنتك تراك'},{id:'holder',name:'دوايات'},{id:'wallbox',name:'ماجيك وأجراس'},{id:'generic',name:'عام'},{id:'mine',name:'منتجاتي'}];
+const CATS=[{id:'spot',name:'سبوت'},{id:'panel',name:'بانل'},{id:'track',name:'ماجنتك تراك'},{id:'holder',name:'دواية ديكور'},{id:'wallbox',name:'أجراس وعلب'},{id:'mine',name:'منتجاتي'}];
 const BASE_LIST=[
-  {id:'sp-round',cat:'spot',name:'سبوت مدور',en:'MR16 / GU5.3 Swivel Frame, Round Model',w:90,h:90,shape:'round',colors:ROUND_COLORS,draw:(p,c)=>A.spotFrame('round',p.w,c.c)},
-  {id:'sp-square',cat:'spot',name:'سبوت مربع',en:'MR16 / GU5.3 Swivel Frame, Square Model',w:90,h:90,shape:'rect',colors:FRAME12,draw:(p,c)=>A.spotFrame('square',Math.min(p.w,p.h),c.c)},
-  {id:'sp-anti',cat:'spot',name:'سبوت مانع للتوهج',en:'MR16 / GU5.3 Swivel Frame, Round Anti Glare Ring',w:90,h:90,shape:'round',colors:[pair('Black','Black')],draw:(p,c)=>A.spotFrame('round',p.w,c.c,true)},
-  {id:'pn-smd26',cat:'panel',name:'بانل SMD مدور 26 وات',en:'Led Panel SMD 26W Round',w:300,h:300,shape:'round',draw:p=>A.panelRound(p.w)},
-  {id:'tr-spot',cat:'track',name:'سبوت تراك',en:'Track Spotlight',w:110,h:24,shape:'rect',draw:p=>A.bar(p.w,p.h,'spot')},
-  {id:'tr-rflood',cat:'track',name:'فلود تراك مدور',en:'Round Track Floodlight',w:300,h:24,shape:'rect',draw:p=>A.bar(p.w,p.h,'flood')},
-  {id:'tr-rspot',cat:'track',name:'سبوت فلود مدور',en:'Round Spot Floodlight',w:110,h:24,shape:'rect',draw:p=>A.bar(p.w,p.h,'spot')},
-  {id:'tr-rfold',cat:'track',name:'سبوت تراك قابل للطي',en:'Round Track Folding Spot Light',w:220,h:24,shape:'rect',draw:p=>A.bar(p.w,p.h,'fold')},
-  {id:'tr-lflood',cat:'track',name:'فلود حرف L',en:'L-type Floodlights',w:150,h:150,shape:'rect',draw:p=>A.ell(p.w,p.h,true)},
-  {id:'tr-corner',cat:'track',name:'وصلة ركن للتراك',en:'Corner Conductive Module',w:100,h:100,shape:'rect',draw:p=>A.ell(p.w,p.h,false)},
-  {id:'tr-psu',cat:'track',name:'ترانس داخلي للتراك',en:'Track Built-in Power Supply Mate',w:300,h:24,shape:'rect',draw:p=>A.bar(p.w,p.h,'psu')},
-  {id:'lh-plain',cat:'holder',name:'دواية ديكور سادة',en:'Plain Lamp Holder',w:105,h:105,shape:'round',colors:HOLDER_COLORS,draw:(p,c)=>A.holder(p.w,c.c,false)},
-  {id:'lh-flower',cat:'holder',name:'دواية ديكور وردة',en:'Decorative Lamp Holder Flowry "Shiny * Shiny"',w:120,h:120,shape:'round',draw:p=>A.holder(p.w,[TONE['Shiny Silver'][0]],true)},
-  {id:'lh-saqqara',cat:'holder',name:'دواية ديكور سقارة',en:'',w:110,h:110,shape:'round',draw:p=>A.holder(p.w,[TONE.White[0]],false)},
-  {id:'mb-box',cat:'wallbox',name:'علبة ماجيك',en:'Magic Box',w:105,h:70,shape:'rect',draw:p=>A.box(p.w,p.h)},
-  {id:'mb-pro',cat:'wallbox',name:'ماجيك برو',en:'Magic Pro',w:105,h:70,shape:'rect',draw:p=>A.box(p.w,p.h)},
-  {id:'db-bird',cat:'wallbox',name:'جرس عصفور',en:'Bird Sound Bell',w:130,h:90,shape:'rect',draw:p=>A.bell(p.w,p.h)},
-  {id:'db-ding',cat:'wallbox',name:'جرس دينج دونج',en:'Ding Dong Bell',w:160,h:110,shape:'rect',draw:p=>A.bell(p.w,p.h)},
-  {id:'g-sw3',cat:'generic',name:'مفتاح 3 موديول',en:'',w:120,h:80,shape:'rect',draw:p=>A.plate(p.w,p.h,['sw','sw','sw'])},
-  {id:'g-sock3',cat:'generic',name:'بريزة ومفتاح',en:'',w:120,h:80,shape:'rect',draw:p=>A.plate(p.w,p.h,['sock','sw'])},
-  {id:'g-sw4',cat:'generic',name:'لوحة 4 موديول',en:'',w:142,h:80,shape:'rect',draw:p=>A.plate(p.w,p.h,['sw','sw','sw','sw'])},
-  {id:'g-sw7',cat:'generic',name:'لوحة 7 موديول',en:'',w:210,h:80,shape:'rect',draw:p=>A.plate(p.w,p.h,['sw','sw','sw','sock','sw','sw'])},
-  {id:'g-panel60',cat:'generic',name:'بانل 60×60',en:'',w:595,h:595,shape:'rect',draw:p=>A.panelSquare(p.w,p.h)},
-  {id:'g-batten',cat:'generic',name:'كشاف خطي 120 سم',en:'',w:1200,h:75,shape:'rect',draw:p=>A.batten(p.w,p.h)},
-  {id:'g-flood',cat:'generic',name:'كشاف فلود 50 وات',en:'',w:215,h:170,shape:'rect',draw:p=>A.flood(p.w,p.h)}
+  {id:'sp-round',cat:'spot',name:'سبوت مدور',en:'MR16 / GU5.3 Swivel Frame, Round Model',w:90,h:90,shape:'round',colors:ROUND_REAL,draw:(p,c)=>A.spotFrame('round',p.w,c.c)},
+  {id:'sp-square',cat:'spot',name:'سبوت مربع',en:'MR16 / GU5.3 Swivel Frame, Square Model',w:90,h:90,shape:'rect',colors:SQUARE_REAL,draw:(p,c)=>A.spotFrame('square',Math.min(p.w,p.h),c.c)},
+  {id:'sp-anti',cat:'spot',name:'سبوت مانع للتوهج',en:'MR16 / GU5.3 Swivel Frame, Round Anti Glare Ring',w:90,h:90,shape:'round',colors:ANTI_REAL,draw:(p,c)=>A.spotFrame('round',p.w,c.c,true)},
+  {id:'pn-smd26',cat:'panel',name:'بانل SMD مدور 26 وات',en:'Led Panel SMD 26W Round',w:300,h:300,photo:'pn-smd26',shape:'round',draw:p=>A.panelRound(p.w)},
+  {id:'tr-spot',cat:'track',name:'سبوت تراك',en:'Track Spotlight',w:70,h:113,photo:'tr-spot',shape:'rect',draw:p=>A.bar(p.w,p.h,'spot')},
+  {id:'tr-rflood',cat:'track',name:'فلود تراك مدور',en:'Round Track Floodlight',w:300,h:126,photo:'tr-rflood',shape:'rect',draw:p=>A.bar(p.w,p.h,'flood')},
+  {id:'tr-rspot',cat:'track',name:'سبوت فلود مدور',en:'Round Spot Floodlight',w:300,h:86,photo:'tr-rspot',shape:'rect',draw:p=>A.bar(p.w,p.h,'spot')},
+  {id:'tr-rfold',cat:'track',name:'سبوت تراك قابل للطي',en:'Round Track Folding Spot Light',w:160,h:140,photo:'tr-rfold',shape:'rect',draw:p=>A.bar(p.w,p.h,'fold')},
+  {id:'tr-lflood',cat:'track',name:'فلود حرف L',en:'L-type Floodlights',w:300,h:271,photo:'tr-lflood',shape:'rect',draw:p=>A.ell(p.w,p.h,true)},
+  {id:'tr-corner',cat:'track',name:'وصلة ركن للتراك',en:'Corner Conductive Module',w:150,h:109,photo:'tr-corner',shape:'rect',draw:p=>A.ell(p.w,p.h,false)},
+  {id:'tr-psu',cat:'track',name:'ترانس داخلي للتراك',en:'Track Built-in Power Supply Mate',w:200,h:184,photo:'tr-psu',shape:'rect',draw:p=>A.bar(p.w,p.h,'psu')},
+  {id:'lh-flower',cat:'holder',name:'دواية ديكور وردة',en:'Decorative Lamp Holder Flowry "Shiny * Shiny"',w:120,h:112,photo:'lh-flower',shape:'round',draw:p=>A.holder(p.w,[TONE['Shiny Silver'][0]],true)},
+  {id:'mb-box',cat:'wallbox',name:'علبة ماجيك',en:'Magic Box',w:105,h:103,photo:'mb-box',shape:'rect',draw:p=>A.box(p.w,p.h)},
+  {id:'mb-pro',cat:'wallbox',name:'ماجيك برو',en:'Magic Pro',w:105,h:113,photo:'mb-pro',shape:'rect',draw:p=>A.box(p.w,p.h)},
+  {id:'db-bird',cat:'wallbox',name:'جرس عصفور',en:'Bird Sound Bell',w:130,h:95,photo:'db-bird',shape:'rect',draw:p=>A.bell(p.w,p.h)},
+  {id:'db-ding',cat:'wallbox',name:'جرس دينج دونج',en:'Ding Dong Bell',w:160,h:112,photo:'db-ding',shape:'rect',draw:p=>A.bell(p.w,p.h)}
 ];
-const BASE={};for(const b of BASE_LIST){b.approx=true;BASE[b.id]=b;}
+const BASE={};for(const b of BASE_LIST){b.approx=true;BASE[b.id]=b;
+  if(b.photo) PHOTO_FILES.push(b.photo+'.webp');
+  if(b.colors) for(const c of b.colors) if(c.file) PHOTO_FILES.push(c.file+'.webp');}
 
 /* ---------- elements ---------- */
 const stage=$('#stage'),inner=$('#stageInner'),photo=$('#photo'),pctx=photo.getContext('2d');
@@ -503,7 +513,7 @@ const SHEETS=[sheetGrid,sheetProd,sheetColor,sheetQty,sheetBrand];
 /* ---------- state ---------- */
 let uid=1,downloads=null,db=null,dbFresh=false,dbTimer=0,logoEl=null;
 const state={surface:'ceiling',cat:'spot',demo:true,W:1,H:1,cal:{ax:0,ay:0,bx:1,by:0,mm:1},calibrated:false,items:[],sel:null,mode:'place',
-  view:{z:1,tx:0,ty:0},fit:{f:1,left:0,top:0,cw:1,ch:1},guides:null,calBackup:null,lastCm:29.7,lastColor:{'sp-round':5}};
+  view:{z:1,tx:0,ty:0},fit:{f:1,left:0,top:0,cw:1,ch:1},guides:null,calBackup:null,lastCm:29.7,lastColor:{'sp-round':4}};
 const k=()=>pxPerMm(state.cal);
 const sscale=()=>state.fit.f*state.view.z;
 const selItem=()=>state.items.find(i=>i.id===state.sel)||null;
@@ -569,11 +579,11 @@ function catalogChanged(){
   renderTray();renderItems();renderSelbar();renderAdorn();
 }
 function logoChanged(){
-  const v=store.logo;logoEl=null;
+  const v=store.logo||PH['logo']||null;logoEl=null;
   $('#logoBtn').hidden=!v;$('#logoAdd').hidden=!!v;
   if(v){$('#logoImg').src=v;const im=new Image();im.onload=()=>{logoEl=im;};im.src=v;}
   $('#brandPrev').innerHTML=v?'<img src="'+v+'" alt="اللوجو الحالي">':'لسه مفيش لوجو';
-  $('#brDel').hidden=!v;
+  $('#brDel').hidden=!store.logo;
 }
 
 /* ---------- demo scenes (0.4 px per mm) ---------- */
@@ -613,12 +623,12 @@ function loadDemo(sf){
   if(sf==='ceiling'){
     setCanvas(1600,1100);drawCeiling(pctx,1600,1100);
     state.cal={ax:1190,ay:410,bx:1430,by:410,mm:600};
-    for(const y of [380,780]) for(const x of [300,700,1100]) state.items.push({id:uid++,pid:'sp-round',color:5,x:x,y:y,rot:0,tilt:0,gid:'demo'});
+    for(const y of [380,780]) for(const x of [300,700,1100]) state.items.push({id:uid++,pid:'sp-round',color:4,x:x,y:y,rot:0,tilt:0,gid:'demo'});
     state.sel=state.items[1].id;
   }else{
     setCanvas(1600,1180);drawWall(pctx,1600,1180);
     state.cal={ax:1000,ay:560,bx:1360,by:560,mm:900};
-    state.items.push({id:uid++,pid:'g-sw3',color:0,x:892,y:600,rot:0,tilt:0,gid:null},{id:uid++,pid:'g-sock3',color:0,x:360,y:940,rot:0,tilt:0,gid:null});
+    state.items.push({id:uid++,pid:'db-ding',color:0,x:820,y:560,rot:0,tilt:0,gid:null},{id:uid++,pid:'db-bird',color:0,x:420,y:560,rot:0,tilt:0,gid:null});
     state.sel=state.items[0].id;
   }
   state.calibrated=true;setMode('place');
@@ -829,7 +839,7 @@ tray.addEventListener('click',e=>{
 actColor.addEventListener('click',()=>{
   const it=selItem(),p=it&&prod(it.pid);if(!p||!p.colors||p.colors.length<2||p.img) return;
   $('#colTitle').textContent=p.colors[0].en.indexOf('*')>0?'لون الإطار × الحلقة':'اللون';
-  $('#swatches').innerHTML=p.colors.map((c,i)=>'<button type="button" class="sw" data-ci="'+i+'" aria-pressed="'+(i===(it.color||0))+'"><svg viewBox="'+thumbBox(p)+'" aria-hidden="true">'+p.draw(p,c)+'</svg><span>'+c.ar+'</span></button>').join('');
+  $('#swatches').innerHTML=p.colors.map((c,i)=>'<button type="button" class="sw" data-ci="'+i+'" aria-pressed="'+(i===(it.color||0))+'"><svg viewBox="'+thumbBox(p)+'" aria-hidden="true">'+artFor(p,i)+'</svg><span>'+c.ar+'</span></button>').join('');
   sheetColor.hidden=false;
 });
 $('#swatches').addEventListener('click',e=>{
@@ -880,7 +890,7 @@ calCancel.addEventListener('click',()=>{
 });
 
 /* ---------- surface, photo inputs, zoom ---------- */
-function setSurface(sf){state.surface=sf;state.cat=sf==='ceiling'?'spot':'generic';if(state.demo) loadDemo(sf);else setMode(state.mode);}
+function setSurface(sf){state.surface=sf;state.cat=sf==='ceiling'?'spot':'wallbox';if(state.demo) loadDemo(sf);else setMode(state.mode);}
 $('#surfCeiling').addEventListener('click',()=>setSurface('ceiling'));
 $('#surfWall').addEventListener('click',()=>setSurface('wall'));
 for(const id of ['fileCam','filePick']) $('#'+id).addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];e.target.value='';loadPhoto(f);});
@@ -988,6 +998,7 @@ function setShape(sh){
 }
 function baseNote(){
   if(pImg) return 'فيه صورة محفوظة للمنتج.';
+  if(!edit||edit.kind==='new') return 'صوّر المنتج من قدّام على ورقة بيضا أو خلفية سادة، والتطبيق هيشيل الخلفية لوحده.';
   if(!edit||edit.kind!=='base') return 'من غير صورة هيترسم شكل بسيط بنفس المقاس.';
   const b=BASE[edit.id];
   if(store.ov[edit.id]) return 'المقاس ده محفوظ من قياسك.';
@@ -1007,12 +1018,60 @@ function openProd(kind,id){
 }
 $('#pRound').addEventListener('click',()=>setShape('round'));
 $('#pRect').addEventListener('click',()=>setShape('rect'));
-$('#fileProd').addEventListener('change',async e=>{
+/* Removes a plain background (white paper, a wall) from a product photo: everything connected to the
+   picture's edge that is close to the edge colour becomes transparent, then the picture is cropped. */
+function cutBackground(dataUrl){
+  return loadImg(dataUrl).then(im=>{
+    const w=im.naturalWidth,h=im.naturalHeight,c=document.createElement('canvas');c.width=w;c.height=h;
+    const g=c.getContext('2d');g.drawImage(im,0,0);
+    const id=g.getImageData(0,0,w,h),d=id.data;
+    let sr=0,sg=0,sb=0,n=0;const edge=[];
+    for(let x=0;x<w;x++){edge.push(x,(h-1)*w+x);}
+    for(let y=0;y<h;y++){edge.push(y*w,y*w+w-1);}
+    for(const i of edge){sr+=d[i*4];sg+=d[i*4+1];sb+=d[i*4+2];n++;}
+    sr/=n;sg/=n;sb/=n;
+    let v=0;for(const i of edge){const dr=d[i*4]-sr,dg=d[i*4+1]-sg,db=d[i*4+2]-sb;v+=dr*dr+dg*dg+db*db;}
+    const thr=Math.max(26,Math.min(70,2.6*Math.sqrt(v/n)));
+    const near=i=>{const dr=d[i*4]-sr,dg=d[i*4+1]-sg,db=d[i*4+2]-sb;return dr*dr+dg*dg+db*db<thr*thr;};
+    const bg=new Uint8Array(w*h),stack=[];
+    for(const i of edge) if(!bg[i]&&near(i)){bg[i]=1;stack.push(i);}
+    while(stack.length){
+      const i=stack.pop(),x=i%w,y=(i-x)/w;
+      const nb=[x>0?i-1:-1,x<w-1?i+1:-1,y>0?i-w:-1,y<h-1?i+w:-1];
+      for(const j of nb) if(j>=0&&!bg[j]&&near(j)){bg[j]=1;stack.push(j);}
+    }
+    let cnt=0;for(let i=0;i<w*h;i++) cnt+=bg[i];
+    const frac=cnt/(w*h);
+    if(frac<0.04||frac>0.96) return null;
+    let x0=w,y0=h,x1=-1,y1=-1;
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+      const i=y*w+x;
+      if(bg[i]){d[i*4+3]=0;continue;}
+      // soften the rim: a pixel next to background gets half opacity
+      if((x>0&&bg[i-1])||(x<w-1&&bg[i+1])||(y>0&&bg[i-w])||(y<h-1&&bg[i+w])) d[i*4+3]=140;
+      if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;
+    }
+    if(x1<x0||y1<y0) return null;
+    g.putImageData(id,0,0);
+    const o=document.createElement('canvas');o.width=x1-x0+1;o.height=y1-y0+1;
+    o.getContext('2d').drawImage(c,x0,y0,o.width,o.height,0,0,o.width,o.height);
+    let out=o.toDataURL('image/webp',.88);if(!IMG_OK.test(out)) out=o.toDataURL('image/png');
+    return okImg(out)?{data:out,ar:o.height/o.width}:null;
+  }).catch(()=>null);
+}
+async function takeProductPhoto(e){
   const f=e.target.files&&e.target.files[0];e.target.value='';if(!f) return;
+  note('بجهّز الصورة…');
   const r=await shrinkImage(f,480);
   if(!r){note('الصورة ما اتفتحتش. جرّب JPG أو PNG.',true);return;}
-  pImg=r.data;pImgAR=r.ar;pImgDel.hidden=false;note('الصورة اتضافت وهتتحفظ مع المنتج.');
-});
+  const cut=await cutBackground(r.data);
+  const use=cut||r;
+  pImg=use.data;pImgAR=use.ar;pImgDel.hidden=false;
+  if(edit&&edit.kind!=='base'&&pShape==='rect'&&parseFloat(pW.value)>0) pH.value=num(parseFloat(pW.value)*pImgAR);
+  note(cut?'الخلفية اتشالت والصورة اتضافت. اكتب المقاس واحفظ.':'الصورة اتضافت. ما قدرتش أشيل الخلفية: صوّر على ورقة بيضا سادة.');
+}
+$('#fileProd').addEventListener('change',takeProductPhoto);
+$('#fileProdCam').addEventListener('change',takeProductPhoto);
 pImgDel.addEventListener('click',()=>{pImg=null;pImgDel.hidden=true;note('الصورة هتتشال لما تحفظ.');});
 pOk.addEventListener('click',async()=>{
   if(!edit) return;
@@ -1110,6 +1169,7 @@ function wireCaps(){
 }
 
 /* ---------- Android app: save to gallery, live camera, back button ---------- */
+function blobToDataUrl(b){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result));r.onerror=()=>rej(r.error);r.readAsDataURL(b);});}
 function blobToB64(b){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]||'');r.onerror=()=>rej(r.error);r.readAsDataURL(b);});}
 function pot(n){let p=32;while(p<n&&p<1024) p*=2;return p;}
 async function productPng(p,ci){
@@ -1122,7 +1182,7 @@ async function productPng(p,ci){
   let d=c.toDataURL('image/webp',.9);if(d.indexOf('data:image/webp')!==0) d=c.toDataURL('image/png');
   return d.split(',')[1];
 }
-const SURF_ORDER={ceiling:['spot','panel','track','holder','wallbox','generic','mine'],wall:['wallbox','generic','spot','track','holder','panel','mine']};
+const SURF_ORDER={ceiling:['spot','panel','track','holder','wallbox','mine'],wall:['wallbox','spot','track','holder','panel','mine']};
 async function startLive(){
   const btn=$('#btnLive');if(btn.disabled) return;
   btn.disabled=true;toast('بجهّز المنتجات للكاميرا…');
@@ -1158,6 +1218,16 @@ if(APP){
 
 /* ---------- start ---------- */
 loadLocal();logoChanged();
+(async()=>{
+  let n=0;
+  await Promise.all(PHOTO_FILES.map(async f=>{
+    try{
+      const r=await fetch('products/'+f);if(!r.ok) return;
+      PH[f.replace(/\.(webp|png)$/,'')]=await blobToDataUrl(await r.blob());n++;
+    }catch(e){}
+  }));
+  if(n){renderItems();renderTray();renderAdorn();logoChanged();}
+})();
 loadDemo('ceiling');
 if(APP) btnSave.hidden=false;
 if(window.ResizeObserver) new ResizeObserver(layout).observe(stage);else window.addEventListener('resize',layout);

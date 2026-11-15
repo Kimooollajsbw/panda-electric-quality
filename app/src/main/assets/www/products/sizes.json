@@ -1,0 +1,136 @@
+{
+ "sp-round__White_White": [
+  700,
+  700
+ ],
+ "sp-round__Black_Black": [
+  700,
+  700
+ ],
+ "sp-round__Black_Gold": [
+  700,
+  700
+ ],
+ "sp-round__Champagne_Gold": [
+  700,
+  700
+ ],
+ "sp-anti__Black_Black": [
+  700,
+  700
+ ],
+ "sp-round__White_Gold": "derived",
+ "sp-round__Pearl_Gold": "derived",
+ "sp-square__Black_Black": [
+  700,
+  700
+ ],
+ "sp-square__Black_Gold": [
+  700,
+  700
+ ],
+ "sp-square__Champagne_Gold": [
+  700,
+  700
+ ],
+ "sp-square__White_Silver": [
+  700,
+  700
+ ],
+ "sp-square__Silver_Silver": [
+  700,
+  700
+ ],
+ "sp-square__White_Gold": [
+  700,
+  700
+ ],
+ "tr-spot": [
+  400,
+  646
+ ],
+ "tr-rflood": [
+  579,
+  243
+ ],
+ "tr-rspot": [
+  635,
+  181
+ ],
+ "tr-rfold": [
+  433,
+  378
+ ],
+ "tr-lflood": [
+  700,
+  632
+ ],
+ "tr-corner": [
+  595,
+  432
+ ],
+ "tr-psu": [
+  527,
+  486
+ ],
+ "mb-box": [
+  700,
+  684
+ ],
+ "mb-pro": [
+  648,
+  700
+ ],
+ "lh-flower": [
+  700,
+  651
+ ],
+ "db-bird": [
+  700,
+  512
+ ],
+ "db-bird_corners": [
+  [
+   0,
+   453
+  ],
+  [
+   574,
+   0
+  ],
+  [
+   1063,
+   220
+  ],
+  [
+   488,
+   673
+  ]
+ ],
+ "db-ding": [
+  700,
+  489
+ ],
+ "db-ding_corners": [
+  [
+   0,
+   403
+  ],
+  [
+   674,
+   0
+  ],
+  [
+   1148,
+   276
+  ],
+  [
+   473,
+   679
+  ]
+ ],
+ "pn-smd26": [
+  700,
+  700
+ ]
+}
