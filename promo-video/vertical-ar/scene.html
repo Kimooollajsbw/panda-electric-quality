@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<style>
+@font-face{font-family:Plex;src:url(fonts/Plex-Regular.ttf);font-weight:400}@font-face{font-family:Plex;src:url(fonts/Plex-Medium.ttf);font-weight:500}@font-face{font-family:Plex;src:url(fonts/Plex-SemiBold.ttf);font-weight:600}@font-face{font-family:Plex;src:url(fonts/Plex-Bold.ttf);font-weight:700 900}
+:root{--red:#ff1f3d;--bg:#09090b;--card:#141418;--line:rgba(255,255,255,.08);--mute:#8b8b95}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1080px;height:1920px;overflow:hidden;background:var(--bg);font-family:Inter,Plex,sans-serif;color:#fff}
+#stage{position:absolute;inset:0;overflow:hidden}
+#glow{position:absolute;width:1500px;height:1500px;border-radius:50%;background:radial-gradient(circle,rgba(255,31,61,.42) 0%,rgba(255,31,61,.12) 35%,transparent 65%);filter:blur(30px)}
+#glow2{position:absolute;width:1100px;height:1100px;border-radius:50%;background:radial-gradient(circle,rgba(255,90,60,.18),transparent 60%);filter:blur(40px)}
+.scene{position:absolute;inset:0;transform-origin:50% 50%}
+.latin{font-family:Inter,sans-serif;direction:ltr}
+/* phone */
+#phoneWrap{position:absolute;left:50%;top:50%;width:600px;height:1230px;margin:-615px 0 0 -300px;perspective:2200px}
+#phone{width:100%;height:100%;border-radius:84px;background:#0d0d10;border:13px solid #2a2a30;box-shadow:0 0 0 2px #444 inset,0 80px 160px rgba(0,0,0,.7);overflow:hidden;position:relative}
+#notch{position:absolute;top:18px;left:50%;width:170px;height:48px;margin-left:-85px;background:#000;border-radius:26px;z-index:5}
+.wall{position:absolute;inset:0;background:radial-gradient(120% 80% at 30% 100%,#5a0d1c 0%,#22060c 45%,#0b0b10 80%)}
+#lock{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;padding-top:150px}
+#lock .time{font-size:140px;font-weight:600;letter-spacing:-4px;font-family:Inter}
+#lock .date{font-size:28px;color:#ddd;margin-top:4px}
+#home{position:absolute;inset:0;padding:100px 30px 0;opacity:0}
+.widget{background:rgba(25,25,30,.85);border:1px solid var(--line);border-radius:40px;padding:26px 28px}
+.wtop{display:flex;align-items:center;gap:12px;font-weight:700;font-size:24px}
+.live{margin-inline-start:auto;font-size:20px;color:#ffd1d7;display:flex;align-items:center;gap:8px;font-weight:700}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--red);box-shadow:0 0 12px var(--red);flex:none}
+.wtitle{font-size:28px;font-weight:600;margin-top:12px}
+.wsub{font-size:21px;color:var(--mute);margin-top:2px}
+.stack{display:flex;margin-top:16px;align-items:center}
+.av{width:48px;height:48px;border-radius:50%;border:3px solid #19191e;margin-inline-start:-12px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;flex:none}
+.av:first-child{margin-inline-start:0}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:30px 18px;margin-top:38px}
+.app{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:17px;color:#ddd}
+.ico{width:100px;height:100px;border-radius:26px}
+.yt{background:var(--red);display:flex;align-items:center;justify-content:center}
+.tri{width:0;height:0;border-left:30px solid #fff;border-top:19px solid transparent;border-bottom:19px solid transparent;margin-left:7px}
+/* cards */
+.pills{position:absolute;left:60px;right:60px;top:300px;display:flex;flex-wrap:wrap;gap:16px;justify-content:flex-start}
+.pill{height:72px;padding:0 34px;border-radius:36px;background:#1e1e24;border:1px solid var(--line);display:flex;align-items:center;font-size:26px;font-weight:600;color:#cfcfd6;position:relative;z-index:2}
+#pillHi{position:absolute;height:72px;border-radius:36px;background:var(--red);box-shadow:0 0 34px rgba(255,31,61,.6);z-index:1}
+.vcard{position:absolute;border-radius:34px;background:var(--card);border:1px solid var(--line);overflow:hidden}
+.thumb{position:relative;display:flex;align-items:center;justify-content:center;background-size:cover;background-position:center}
+.pb{width:84px;height:84px;border-radius:50%;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+.pb .tri{border-left-width:24px;border-top-width:15px;border-bottom-width:15px;margin-left:6px}
+.dur{position:absolute;left:16px;bottom:14px;background:rgba(0,0,0,.75);font-size:22px;padding:2px 10px;border-radius:8px;font-weight:600;font-family:Inter}
+.vmeta{padding:16px 26px}
+.vt{font-size:30px;font-weight:600;line-height:1.3}
+.vs{font-size:22px;color:var(--mute)}
+#cont{position:absolute;left:60px;width:960px;height:210px;border-radius:34px;background:linear-gradient(270deg,rgba(255,31,61,.22),rgba(30,30,36,.9) 60%);border:1px solid rgba(255,31,61,.35);padding:26px 36px}
+.bar{height:10px;border-radius:5px;background:#2c2c33;margin-top:18px;overflow:hidden;direction:rtl}
+#barFill{height:100%;background:var(--red);box-shadow:0 0 12px var(--red);width:30%}
+/* comments */
+#panel{position:absolute;left:110px;top:400px;width:860px;height:1120px;border-radius:44px;background:var(--card);border:1px solid var(--line);padding:46px 46px;box-shadow:0 40px 100px rgba(0,0,0,.6)}
+.row{display:flex;align-items:center;gap:18px}
+.chip{padding:8px 24px;border-radius:26px;background:#22222a;font-size:26px;font-weight:700;color:#ddd}
+.chip.on{background:rgba(255,31,61,.18);color:#ff8a9a;border:1px solid rgba(255,31,61,.4)}
+.lbl{font-size:24px;color:var(--mute);margin-top:40px;font-weight:700}
+.cm{display:flex;gap:20px;margin-top:36px;align-items:flex-start}
+.cm .av{width:64px;height:64px;font-size:26px}
+.cm .who{font-size:22px;color:var(--mute)}
+.cm .txt{font-size:28px;font-weight:500;margin-top:2px}
+#input{position:absolute;left:46px;right:46px;bottom:46px;height:100px;border-radius:50px;background:#1f1f26;border:1px solid var(--line);display:flex;align-items:center;padding-inline-start:40px;font-size:28px;color:#6f6f78}
+#send{position:absolute;left:10px;top:10px;width:80px;height:80px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center}
+#send .arr{width:0;height:0;border-bottom:30px solid #fff;border-left:18px solid transparent;border-right:18px solid transparent;margin-top:-4px}
+/* text */
+.line{position:absolute;left:70px;right:70px;top:50%;transform-origin:50% 50%;text-align:center;font-size:74px;font-weight:700;line-height:1.5;opacity:0;margin-top:-56px}
+.line b{color:var(--red);font-weight:700}
+/* logo */
+#logoIcon{position:absolute;left:50%;top:50%;width:240px;height:170px;margin:-85px 0 0 -120px;border-radius:48px;background:var(--red);display:flex;align-items:center;justify-content:center;box-shadow:0 0 100px rgba(255,31,61,.55)}
+#logoIcon .tri{border-left-width:62px;border-top-width:38px;border-bottom-width:38px;margin-left:14px}
+#word{position:absolute;left:0;right:0;top:1010px;text-align:center;font-size:150px;font-weight:700;letter-spacing:-5px;white-space:nowrap}
+#word sup{font-size:60px;color:var(--red);margin-left:12px;letter-spacing:0;vertical-align:top;position:relative;top:18px}
+#disc{position:absolute;left:80px;right:80px;top:1260px;text-align:center;font-size:30px;color:#80808a;line-height:1.6}
+</style></head>
+<body><div id="stage">
+<div id="glow"></div><div id="glow2"></div>
+
+<div class="scene" id="sA">
+ <div id="phoneWrap"><div id="phone">
+  <div class="wall"></div><div id="notch"></div>
+  <div id="lock"><div class="time">9:41</div><div class="date">الاتنين، 17 نوفمبر</div></div>
+  <div id="home">
+   <div class="widget" id="widget">
+    <div class="wtop"><div class="ico yt" style="width:42px;height:30px;border-radius:9px"><div class="tri" style="border-left-width:12px;border-top-width:8px;border-bottom-width:8px;margin-left:3px"></div></div><span class="latin">YouTube</span><div class="live"><span class="dot"></span>مباشر</div></div>
+    <div class="wtitle">صانع المحتوى المفضّل عندك لايف دلوقتي</div>
+    <div class="wsub">12.4 ألف بيتفرجوا معاك</div>
+    <div class="stack"><div class="av" style="background:#e85d75">ن</div><div class="av" style="background:#5d8ae8">آ</div><div class="av" style="background:#e8b25d">س</div><div class="av" style="background:#6be85d;color:#111">ك</div><span style="margin-inline-start:14px;font-size:21px;color:#ccc">+ 3 من صحابك هنا</span></div>
+   </div>
+   <div class="grid">
+    <div class="app"><div class="ico" style="background:linear-gradient(135deg,#3a7bfd,#1d4fd8)"></div>الخرائط</div>
+    <div class="app"><div class="ico" style="background:linear-gradient(135deg,#ffd54a,#f2a400)"></div>الملاحظات</div>
+    <div class="app"><div class="ico" style="background:conic-gradient(#f44,#fb4,#4d4,#4af,#a4f,#f44)"></div>الصور</div>
+    <div class="app"><div class="ico" style="background:#222"></div>الكاميرا</div>
+    <div class="app"><div class="ico" style="background:linear-gradient(135deg,#fd4f6c,#e8243f)"></div>الصحة</div>
+    <div class="app"><div class="ico" style="background:#1c1c1c;border:1px solid #333"></div>الساعة</div>
+    <div class="app"><div class="ico yt"><div class="tri"></div></div><span class="latin">YouTube</span></div>
+    <div class="app"><div class="ico" style="background:linear-gradient(135deg,#41a5ff,#1170e6)"></div>البريد</div>
+    <div class="app"><div class="ico" style="background:linear-gradient(135deg,#2bd46b,#0f9d47)"></div>الرسائل</div>
+    <div class="app"><div class="ico" style="background:linear-gradient(135deg,#1db0ff,#0a6cf0)"></div>المتجر</div>
+    <div class="app"><div class="ico" style="background:linear-gradient(135deg,#ff6ad5,#8a5cff)"></div>الموسيقى</div>
+    <div class="app"><div class="ico" style="background:#8e8e93"></div>الإعدادات</div>
+   </div>
+  </div>
+ </div></div>
+</div>
+
+<div class="scene" id="sB">
+ <div class="pills" id="pills">
+  <div class="pill" id="p0">الرئيسية</div><div class="pill" id="p1">شورتس</div><div class="pill" id="p2">الاشتراكات</div><div class="pill" id="p3">مباشر</div><div class="pill" id="p4">موسيقى</div>
+ </div>
+ <div id="pillHi"></div>
+ <div class="vcard" id="v0" style="left:60px;top:500px;width:960px">
+  <div class="thumb" style="height:540px;background-image:linear-gradient(135deg,#3b0a14,#ff1f3d 120%)"><div class="pb"><div class="tri"></div></div><div class="dur">12:48</div></div>
+  <div class="vmeta"><div class="vt">برمجت تطبيق كامل في 24 ساعة</div><div class="vs">نور تك · 1.2 مليون مشاهدة</div></div>
+ </div>
+ <div class="vcard" id="v1" style="left:560px;top:1200px;width:460px">
+  <div class="thumb" style="height:258px;background-image:linear-gradient(135deg,#0a1f3b,#3d7bff 120%)"><div class="pb"><div class="tri"></div></div><div class="dur">8:02</div></div>
+  <div class="vmeta"><div class="vt" style="font-size:27px">جولة أكل شارع في القاهرة</div><div class="vs" style="font-size:20px">سارة بتاكل · 860 ألف</div></div>
+ </div>
+ <div class="vcard" id="v2" style="left:60px;top:1200px;width:460px">
+  <div class="thumb" style="height:258px;background-image:linear-gradient(135deg,#1a3b0a,#7fd13d 120%)"><div class="pb"><div class="tri"></div></div><div class="dur">0:59</div></div>
+  <div class="vmeta"><div class="vt" style="font-size:27px">طريق الصحرا وقت الغروب</div><div class="vs" style="font-size:20px">شورتس · 4.1 مليون</div></div>
+ </div>
+ <div id="cont" style="top:1640px">
+  <div class="row"><span class="dot"></span><span style="font-size:26px;color:#ffb3bd;font-weight:700">كمّل المشاهدة</span><span style="margin-inline-start:auto;font-size:26px;color:#ccc;font-weight:700;font-family:Inter" id="pct">30%</span></div>
+  <div style="font-size:36px;font-weight:700;margin-top:4px">برمجت تطبيق كامل في 24 ساعة</div>
+  <div class="bar"><div id="barFill"></div></div>
+ </div>
+</div>
+
+<div class="scene" id="sC">
+ <div id="panel">
+  <div class="row"><div class="av" style="width:90px;height:90px;font-size:36px;background:#e85d75">ن</div><div><div style="font-size:36px;font-weight:700">نور تك</div><div style="font-size:24px;color:var(--mute)">1.2 مليون مشترك</div></div><div style="margin-inline-start:auto;padding:12px 34px;border-radius:34px;background:#fff;color:#000;font-weight:700;font-size:27px">اشترك</div></div>
+  <div class="lbl">التفاعلات</div>
+  <div class="row" style="margin-top:16px"><div class="chip on">إعجاب 24 ألف</div><div class="chip">نار 1.1 ألف</div><div class="chip">حب 860</div></div>
+  <div class="lbl">التعليقات</div>
+  <div class="cm" id="c0"><div class="av" style="background:#5d8ae8">آ</div><div><div class="who">آدم · من دقيقتين</div><div class="txt">التصميم ده نضيف جدًا</div></div></div>
+  <div class="cm" id="c1"><div class="av" style="background:#e8b25d">س</div><div><div class="who">سلمى · من 5 دقايق</div><div class="txt">أخيرًا وضع داكن شكله فخم</div></div></div>
+  <div class="cm" id="c2"><div class="av" style="background:#6be85d;color:#111">ك</div><div><div class="who">كريم · من 9 دقايق</div><div class="txt">نزّلوه بقى بالله عليكم</div></div></div>
+  <div class="cm" id="c3"><div class="av" style="background:#b05de8">م</div><div><div class="who">منة · من 12 دقيقة</div><div class="txt">الأحمر مع الأسود تحفة</div></div></div>
+  <div id="input">اكتب تعليق...<div id="send"><div class="arr"></div></div></div>
+ </div>
+</div>
+
+<div class="scene" id="sD">
+ <div class="line" id="l0">شوف اللي بتحبه، <b>في أي مكان</b></div>
+ <div class="line" id="l1">تطبيق واحد، <b>ومحتوى بلا حدود</b></div>
+ <div class="line" id="l2">وقتك، <b>على مزاجك</b></div>
+</div>
+
+<div class="scene" id="sE">
+ <div id="logoIcon"><div class="tri"></div></div>
+ <div id="word" class="latin">YouTube<sup>2.0</sup></div>
+ <div id="disc">مشروع إبداعي مستقل.<br>مش إصدار رسمي من يوتيوب.</div>
+</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const seg=(t,a,b)=>clamp((t-a)/(b-a));
+const lerp=(a,b,p)=>a+(b-a)*p;
+const oC=p=>1-Math.pow(1-p,3), ioC=p=>p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2, oQ=p=>1-Math.pow(1-p,5);
+const oB=p=>{const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(p-1,3)+c1*Math.pow(p-1,2)};
+const vis=(el,on)=>el.style.display=on?'':'none';
+function pop(el,t,start,dx=0,dy=50){const p=seg(t,start,start+.45);el.style.opacity=clamp(p*2.2);el.style.transform=`translate(${dx*(1-oC(p))}px,${dy*(1-oB(p))}px) scale(${lerp(.92,1,oB(p))})`;el.style.filter=`blur(${(1-oC(p))*10}px)`}
+function center(el){const r=el.getBoundingClientRect();return [r.left+r.width/2,r.top+r.height/2]}
+
+window.render=function(t){
+ $('glow').style.left=(lerp(-500,200,(Math.sin(t*.35)+1)/2))+'px';
+ $('glow').style.top=(lerp(900,100,(Math.cos(t*.27)+1)/2))+'px';
+ $('glow2').style.left=(300-t*20)+'px';$('glow2').style.top=(-300+t*30)+'px';
+
+ const A=$('sA');vis(A,t<3.4);
+ if(t<3.4){
+  const p=oQ(seg(t,0,1.4));
+  $('phone').style.transform=`translate(${lerp(-500,0,p)}px,${lerp(700,0,p)}px) rotateZ(${lerp(32,0,p)}deg) rotateY(${lerp(-45,0,p)}deg) rotateX(${lerp(25,0,p)}deg) scale(${lerp(.55,1,p)})`;
+  $('phoneWrap').style.opacity=seg(t,.05,.35);
+  const h=seg(t,1.15,1.5);$('home').style.opacity=h;$('lock').style.opacity=1-h;$('lock').style.transform=`translateY(${-80*h}px)`;
+  pop($('widget'),t,1.3,0,40);
+  const z=ioC(seg(t,1.7,3.2));
+  A.style.transformOrigin='50% 26%';
+  A.style.transform=`scale(${lerp(.88,1.7,z)}) translateY(${lerp(0,180,z)}px)`;
+  const w=seg(t,3.05,3.35);A.style.filter=`blur(${w*40}px)`;A.style.opacity=1-w;
+  if(w>0)A.style.transform+=` translateY(${-w*400}px)`;
+ }
+ const B=$('sB');vis(B,t>3.2&&t<6.8);
+ if(t>3.2&&t<6.8){
+  B.style.transform='none';
+  const ent=seg(t,3.2,3.5),ex=seg(t,6.45,6.8);
+  ['p0','p1','p2','p3','p4'].forEach((id,i)=>pop($(id),t,3.35+i*.07,0,30));
+  const hm=ioC(seg(t,4.5,4.85));const p0=$('p0'),p1=$('p1');
+  p0.style.transform=p1.style.transform='none';
+  const x=lerp(p0.offsetLeft,p1.offsetLeft,hm)+60,wd=lerp(p0.offsetWidth,p1.offsetWidth,hm);
+  const hp=seg(t,3.55,3.9);const hi=$('pillHi');hi.style.left=x+'px';hi.style.top=(300+p0.offsetTop)+'px';hi.style.width=wd+'px';hi.style.opacity=hp;hi.style.transform=`scale(${lerp(.6,1,oB(hp))})`;
+  [p0,p1].forEach((el,i)=>{const on=i===0?1-hm:hm;el.style.background=on>.5?'transparent':'#1e1e24';el.style.borderColor=on>.5?'transparent':'';el.style.color=on>.5?'#fff':'#cfcfd6'});
+  ['p0','p1','p2','p3','p4'].forEach((id,i)=>pop($(id),t,3.35+i*.07,0,30));
+  ['v0','v1','v2'].forEach((id,i)=>pop($(id),t,3.6+i*.14,0,90));
+  pop($('cont'),t,4.9,0,70);
+  const bp=lerp(30,72,ioC(seg(t,5.2,6.3)));$('barFill').style.width=bp+'%';$('pct').textContent=Math.round(bp)+'%';
+  const push=lerp(.86,.91,ioC(seg(t,3.3,6.4)));
+  B.style.transform=`translate(${ex*900}px,${(1-oC(ent))*400}px) scale(${push})`;
+  B.style.filter=`blur(${Math.max((1-oC(ent))*30,ex*45)}px)`;
+ }
+ const C=$('sC');vis(C,t>6.6&&t<9.35);
+ if(t>6.6&&t<9.35){
+  const e=oC(seg(t,6.6,7.0)),z=ioC(seg(t,8.0,8.9));
+  // send button centre in panel coords: panel left 60 top 330; input bottom 46 left 46, send left 10 top 10 size 80
+  const sx=110+46+10+40, sy=400+1120-46-100+10+40;
+  C.style.transformOrigin=`${sx}px ${sy}px`;
+  C.style.transform=`translate(${-(1-e)*1000+(540-sx)*z}px,${(960-sy)*z}px) scale(${lerp(1,2.4,z)})`;
+  const out=seg(t,9.0,9.35);
+  C.style.filter=`blur(${Math.max((1-e)*45,out*30)}px)`;C.style.opacity=1-out;
+  ['c0','c1','c2','c3'].forEach((id,i)=>pop($(id),t,7.05+i*.16,-40,10));
+  const g=seg(t,8.6,8.75),g2=seg(t,8.75,9.1);
+  const s=$('send');s.style.transform=`scale(${1-.12*g+.12*g2})`;s.style.boxShadow=`0 0 ${10+60*g}px ${8*g}px rgba(255,31,61,${.3+.6*g*(1-g2*.5)})`;
+ }
+ const D=$('sD');vis(D,t>9.3&&t<14.7);
+ ['l0','l1','l2'].forEach((id,i)=>{
+  const s=9.4+i*1.75,el=$(id);
+  const a=seg(t,s,s+.4),b=seg(t,s+1.35,s+1.7);
+  el.style.opacity=oC(a)*(1-b);
+  el.style.filter=`blur(${(1-oC(a))*22+b*22}px)`;
+  el.style.transform=`translateY(${(1-oC(a))*40-b*40}px) scale(${lerp(.95,1.03,seg(t,s,s+1.7))})`;
+ });
+ const E=$('sE');vis(E,t>14.55);
+ if(t>14.55){
+  const p=seg(t,14.65,15.1),up=ioC(seg(t,15.3,15.8));
+  $('logoIcon').style.transform=`translateY(${-170*up}px) scale(${oB(p)})`;$('logoIcon').style.opacity=clamp(p*3);
+  const w=$('word');w.style.opacity=up;w.style.transform=`translateY(${(1-up)*60}px)`;w.style.filter=`blur(${(1-up)*16}px)`;
+  $('disc').style.opacity=seg(t,15.9,16.3)*.95;
+ }
+};
+document.fonts.ready.then(()=>{window.render(0);window.ready=true});
+</script>
+</body></html>

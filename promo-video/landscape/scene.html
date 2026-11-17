@@ -1,0 +1,242 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+:root{--red:#ff1f3d;--bg:#09090b;--card:#141418;--card2:#1b1b21;--line:rgba(255,255,255,.07);--mute:#8b8b95}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg);font-family:Inter,"Inter Display",sans-serif;color:#fff}
+#stage{position:absolute;inset:0;overflow:hidden}
+#glow{position:absolute;width:1700px;height:1700px;border-radius:50%;background:radial-gradient(circle,rgba(255,31,61,.42) 0%,rgba(255,31,61,.12) 35%,transparent 65%);filter:blur(30px)}
+#glow2{position:absolute;width:1200px;height:1200px;border-radius:50%;background:radial-gradient(circle,rgba(255,90,60,.18),transparent 60%);filter:blur(40px)}
+.scene{position:absolute;inset:0;transform-origin:50% 50%}
+.abs{position:absolute}
+/* phone */
+#phoneWrap{position:absolute;left:50%;top:50%;width:420px;height:860px;margin:-430px 0 0 -210px;perspective:1800px}
+#phone{width:100%;height:100%;border-radius:64px;background:#0d0d10;border:10px solid #2a2a30;box-shadow:0 0 0 2px #444 inset,0 60px 120px rgba(0,0,0,.7);overflow:hidden;position:relative;transform-style:preserve-3d}
+#notch{position:absolute;top:14px;left:50%;width:120px;height:34px;margin-left:-60px;background:#000;border-radius:20px;z-index:5}
+.wall{position:absolute;inset:0;background:radial-gradient(120% 80% at 70% 100%,#5a0d1c 0%,#22060c 45%,#0b0b10 80%)}
+#lock{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;padding-top:110px}
+#lock .time{font-size:96px;font-weight:600;letter-spacing:-3px}
+#lock .date{font-size:20px;color:#ddd;margin-top:4px}
+#home{position:absolute;inset:0;padding:70px 22px 0;opacity:0}
+.widget{background:rgba(25,25,30,.82);border:1px solid var(--line);border-radius:30px;padding:18px 20px;backdrop-filter:blur(10px)}
+.wtop{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px}
+.live{margin-left:auto;font-size:13px;color:#ffd1d7;display:flex;align-items:center;gap:6px;font-weight:600}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--red);box-shadow:0 0 10px var(--red)}
+.wtitle{font-size:19px;font-weight:600;margin-top:12px}
+.wsub{font-size:14px;color:var(--mute);margin-top:3px}
+.stack{display:flex;margin-top:14px;align-items:center}
+.av{width:34px;height:34px;border-radius:50%;border:2px solid #19191e;margin-left:-8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+.av:first-child{margin-left:0}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px 14px;margin-top:26px}
+.app{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;color:#ddd}
+.ico{width:70px;height:70px;border-radius:18px}
+.yt{background:var(--red);display:flex;align-items:center;justify-content:center;position:relative}
+.tri{width:0;height:0;border-left:22px solid #fff;border-top:14px solid transparent;border-bottom:14px solid transparent;margin-left:5px}
+/* UI cards */
+.pill{position:absolute;height:58px;padding:0 28px;border-radius:29px;background:#1e1e24;border:1px solid var(--line);display:flex;align-items:center;font-size:22px;font-weight:600;color:#cfcfd6}
+#pillHi{position:absolute;height:58px;border-radius:29px;background:var(--red);box-shadow:0 0 30px rgba(255,31,61,.6)}
+.vcard{position:absolute;width:420px;height:330px;border-radius:28px;background:var(--card);border:1px solid var(--line);overflow:hidden}
+.thumb{height:220px;position:relative;display:flex;align-items:center;justify-content:center}
+.thumb .pb{width:64px;height:64px;border-radius:50%;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+.thumb .pb .tri{border-left-width:18px;border-top-width:11px;border-bottom-width:11px;margin-left:4px}
+.dur{position:absolute;right:14px;bottom:12px;background:rgba(0,0,0,.7);font-size:15px;padding:3px 8px;border-radius:6px;font-weight:600}
+.vmeta{padding:16px 20px}
+.vt{font-size:21px;font-weight:600}
+.vs{font-size:15px;color:var(--mute);margin-top:6px}
+#cont{position:absolute;width:1300px;height:170px;border-radius:30px;background:linear-gradient(90deg,rgba(255,31,61,.20),rgba(30,30,36,.9) 55%);border:1px solid rgba(255,31,61,.35);padding:28px 34px}
+.bar{height:8px;border-radius:4px;background:#2c2c33;margin-top:22px;overflow:hidden}
+#barFill{height:100%;background:var(--red);box-shadow:0 0 12px var(--red);width:30%}
+/* comments */
+#panel{position:absolute;left:50%;top:50%;width:820px;height:760px;margin:-380px 0 0 -410px;border-radius:36px;background:var(--card);border:1px solid var(--line);padding:36px 40px;box-shadow:0 40px 100px rgba(0,0,0,.6)}
+.row{display:flex;align-items:center;gap:16px}
+.chip{padding:9px 18px;border-radius:20px;background:#22222a;font-size:19px;font-weight:600;color:#ddd}
+.chip.on{background:rgba(255,31,61,.18);color:#ff8a9a;border:1px solid rgba(255,31,61,.4)}
+.cm{display:flex;gap:16px;margin-top:26px}
+.cm .who{font-size:16px;color:var(--mute)}
+.cm .txt{font-size:20px;margin-top:4px}
+#input{position:absolute;left:40px;right:40px;bottom:36px;height:76px;border-radius:38px;background:#1f1f26;border:1px solid var(--line);display:flex;align-items:center;padding-left:30px;font-size:20px;color:#6f6f78}
+#send{position:absolute;right:8px;top:8px;width:60px;height:60px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center}
+#send .arr{width:0;height:0;border-bottom:22px solid #fff;border-left:13px solid transparent;border-right:13px solid transparent;margin-top:-4px}
+/* text */
+.line{position:absolute;left:0;right:0;top:50%;margin-top:-50px;text-align:center;font-size:84px;font-weight:700;letter-spacing:-2.5px;opacity:0}
+.line b{color:var(--red);font-weight:700}
+/* logo */
+#logoIcon{position:absolute;left:50%;top:50%;width:170px;height:120px;margin:-60px 0 0 -85px;border-radius:34px;background:var(--red);display:flex;align-items:center;justify-content:center;box-shadow:0 0 80px rgba(255,31,61,.55)}
+#logoIcon .tri{border-left-width:44px;border-top-width:27px;border-bottom-width:27px;margin-left:10px}
+#word{position:absolute;top:50%;margin-top:-62px;height:124px;display:flex;align-items:center;font-size:118px;font-weight:700;letter-spacing:-4px;white-space:nowrap;overflow:hidden}
+#word sup{font-size:48px;color:var(--red);margin-left:14px;letter-spacing:0;align-self:flex-start;margin-top:8px}
+#disc{position:absolute;left:0;right:0;top:640px;text-align:center;font-size:20px;color:#77777f;line-height:1.5}
+#fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none}
+</style></head>
+<body><div id="stage">
+<div id="glow"></div><div id="glow2"></div>
+
+<!-- A: phone -->
+<div class="scene" id="sA">
+ <div id="phoneWrap"><div id="phone">
+  <div class="wall"></div><div id="notch"></div>
+  <div id="lock"><div class="time">9:41</div><div class="date">Monday, November 17</div></div>
+  <div id="home">
+   <div class="widget" id="widget">
+    <div class="wtop"><div class="ico yt" style="width:30px;height:22px;border-radius:7px"><div class="tri" style="border-left-width:9px;border-top-width:6px;border-bottom-width:6px;margin-left:2px"></div></div>YOUTUBE<div class="live"><span class="dot"></span>LIVE</div></div>
+    <div class="wtitle">Your favorite creator is live</div>
+    <div class="wsub">Join 12.4K people watching now</div>
+    <div class="stack"><div class="av" style="background:#e85d75">N</div><div class="av" style="background:#5d8ae8">A</div><div class="av" style="background:#e8b25d">S</div><div class="av" style="background:#6be85d;color:#111">K</div><span style="margin-left:12px;font-size:14px;color:#ccc">+ 3 friends here</span></div>
+   </div>
+   <div class="grid">
+    <div class="app"><div class="ico" style="background:linear-gradient(135deg,#3a7bfd,#1d4fd8)"></div>Maps</div>
+    <div class="app"><div class="ico" style="background:linear-gradient(135deg,#ffd54a,#f2a400)"></div>Notes</div>
+    <div class="app"><div class="ico" style="background:conic-gradient(#f44,#fb4,#4d4,#4af,#a4f,#f44)"></div>Photos</div>
+    <div class="app"><div class="ico" style="background:#222"></div>Camera</div>
+    <div class="app"><div class="ico" style="background:linear-gradient(135deg,#fd4f6c,#e8243f)"></div>Health</div>
+    <div class="app"><div class="ico" style="background:#1c1c1c;border:1px solid #333"></div>Clock</div>
+    <div class="app" id="ytApp"><div class="ico yt"><div class="tri"></div></div>YouTube</div>
+    <div class="app"><div class="ico" style="background:linear-gradient(135deg,#41a5ff,#1170e6)"></div>Mail</div>
+    <div class="app"><div class="ico" style="background:linear-gradient(135deg,#2bd46b,#0f9d47)"></div>Messages</div>
+    <div class="app"><div class="ico" style="background:linear-gradient(135deg,#1db0ff,#0a6cf0)"></div>Store</div>
+    <div class="app"><div class="ico" style="background:linear-gradient(135deg,#ff6ad5,#8a5cff)"></div>Music</div>
+    <div class="app"><div class="ico" style="background:#8e8e93"></div>Settings</div>
+   </div>
+  </div>
+ </div></div>
+</div>
+
+<!-- B: UI cards -->
+<div class="scene" id="sB">
+ <div id="pillHi"></div>
+ <div class="pill" id="p0" style="left:330px;top:250px">Home</div>
+ <div class="pill" id="p1" style="left:490px;top:250px">Shorts</div>
+ <div class="pill" id="p2" style="left:660px;top:250px">Subscriptions</div>
+ <div class="pill" id="p3" style="left:920px;top:250px">Live</div>
+ <div class="pill" id="p4" style="left:1060px;top:250px">Music</div>
+ <div class="vcard" id="v0" style="left:310px;top:350px"><div class="thumb" style="background:linear-gradient(135deg,#3b0a14,#ff1f3d 120%)"><div class="pb"><div class="tri"></div></div><div class="dur">12:48</div></div><div class="vmeta"><div class="vt">I built an app in 24 hours</div><div class="vs">Nour Tech · 1.2M views</div></div></div>
+ <div class="vcard" id="v1" style="left:750px;top:350px"><div class="thumb" style="background:linear-gradient(135deg,#0a1f3b,#3d7bff 120%)"><div class="pb"><div class="tri"></div></div><div class="dur">8:02</div></div><div class="vmeta"><div class="vt">Cairo street food tour</div><div class="vs">Sara Eats · 860K views</div></div></div>
+ <div class="vcard" id="v2" style="left:1190px;top:350px"><div class="thumb" style="background:linear-gradient(135deg,#1a3b0a,#7fd13d 120%)"><div class="pb"><div class="tri"></div></div><div class="dur">0:59</div></div><div class="vmeta"><div class="vt">Fastest setup ever</div><div class="vs">Shorts · 4.1M views</div></div></div>
+ <div id="cont" style="left:310px;top:720px">
+  <div class="row"><span class="dot"></span><span style="font-size:19px;color:#ffb3bd;font-weight:600">Continue watching</span><span style="margin-left:auto;font-size:19px;color:#ccc;font-weight:600" id="pct">30%</span></div>
+  <div style="font-size:30px;font-weight:700;margin-top:10px">I built an app in 24 hours</div>
+  <div class="bar"><div id="barFill"></div></div>
+ </div>
+</div>
+
+<!-- C: comments -->
+<div class="scene" id="sC">
+ <div id="panel">
+  <div class="row"><div class="av" style="width:64px;height:64px;font-size:24px;background:#e85d75">N</div><div><div style="font-size:26px;font-weight:700">Nour Tech</div><div style="font-size:17px;color:var(--mute);margin-top:2px">1.2M subscribers</div></div><div style="margin-left:auto;padding:12px 26px;border-radius:26px;background:#fff;color:#000;font-weight:700;font-size:19px">Subscribe</div></div>
+  <div style="font-size:18px;color:var(--mute);margin-top:30px;font-weight:600">Reactions</div>
+  <div class="row" style="margin-top:12px"><div class="chip on">Like 24K</div><div class="chip">Fire 1.1K</div><div class="chip">Love 860</div></div>
+  <div style="font-size:18px;color:var(--mute);margin-top:30px;font-weight:600">Comments</div>
+  <div class="cm" id="c0"><div class="av" style="background:#5d8ae8">A</div><div><div class="who">Adam · 2m</div><div class="txt">This redesign is so clean</div></div></div>
+  <div class="cm" id="c1"><div class="av" style="background:#e8b25d">S</div><div><div class="who">Salma · 5m</div><div class="txt">Finally a dark mode that feels premium</div></div></div>
+  <div class="cm" id="c2"><div class="av" style="background:#6be85d;color:#111">K</div><div><div class="who">Karim · 9m</div><div class="txt">Ship it please</div></div></div>
+  <div id="input">Add a comment...<div id="send"><div class="arr"></div></div></div>
+ </div>
+</div>
+
+<!-- D: text -->
+<div class="scene" id="sD">
+ <div class="line" id="l0">Watch what you love, <b>anywhere</b></div>
+ <div class="line" id="l1">One app, <b>endless creators</b></div>
+ <div class="line" id="l2">Your time, <b>your feed</b></div>
+</div>
+
+<!-- E: logo -->
+<div class="scene" id="sE">
+ <div id="word">YouTube<sup>2.0</sup></div>
+ <div id="logoIcon"><div class="tri"></div></div>
+ <div id="disc">Independent creative concept. Not an official YouTube release.</div>
+</div>
+<div id="fade"></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const seg=(t,a,b)=>clamp((t-a)/(b-a));
+const lerp=(a,b,p)=>a+(b-a)*p;
+const oC=p=>1-Math.pow(1-p,3), ioC=p=>p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2, oQ=p=>1-Math.pow(1-p,5);
+const oB=p=>{const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(p-1,3)+c1*Math.pow(p-1,2)};
+const vis=(el,on)=>el.style.display=on?'':'none';
+function pop(el,t,start,dx=0,dy=40){const p=seg(t,start,start+.45);el.style.opacity=clamp(p*2.2);el.style.transform=`translate(${dx*(1-oC(p))}px,${dy*(1-oB(p))}px) scale(${lerp(.92,1,oB(p))})`;el.style.filter=`blur(${(1-oC(p))*10}px)`}
+
+window.render=function(t){
+ // background glow drifts
+ $('glow').style.left=(lerp(-200,700,(Math.sin(t*.35)+1)/2))+'px';
+ $('glow').style.top=(lerp(250,-150,(Math.cos(t*.27)+1)/2))+'px';
+ $('glow2').style.left=(1100-t*25)+'px';$('glow2').style.top=(-300+t*20)+'px';
+
+ // ---------- A: phone 0 - 3.35
+ const A=$('sA');vis(A,t<3.4);
+ if(t<3.4){
+  const p=oQ(seg(t,0,1.4));
+  $('phone').style.transform=`translate(${lerp(650,0,p)}px,${lerp(420,0,p)}px) rotateZ(${lerp(-38,0,p)}deg) rotateY(${lerp(45,0,p)}deg) rotateX(${lerp(25,0,p)}deg) scale(${lerp(.55,1,p)})`;
+  $('phoneWrap').style.opacity=seg(t,.05,.35);
+  const h=seg(t,1.15,1.5);$('home').style.opacity=h;$('lock').style.opacity=1-h;$('lock').style.transform=`translateY(${-60*h}px)`;
+  pop($('widget'),t,1.3,0,30);
+  const z=ioC(seg(t,1.7,3.2));
+  A.style.transformOrigin='50% 26%';
+  A.style.transform=`scale(${lerp(1,2.7,z)}) translateY(${lerp(0,60,z)}px)`;
+  const w=seg(t,3.05,3.35);A.style.filter=`blur(${w*40}px)`;A.style.opacity=1-w;
+  if(w>0)A.style.transform+=` translateY(${-w*300}px)`;
+ }
+ // ---------- B: cards 3.25 - 6.75
+ const B=$('sB');vis(B,t>3.2&&t<6.8);
+ if(t>3.2&&t<6.8){
+  const ent=seg(t,3.2,3.5);B.style.filter=`blur(${(1-oC(ent))*30}px)`;
+  const push=lerp(1.14,1.22,ioC(seg(t,3.3,6.4)));
+  const ex=seg(t,6.45,6.8);
+  B.style.transform=`translate(${-ex*900}px,${(1-oC(ent))*260}px) scale(${push})`;
+  if(ex>0)B.style.filter=`blur(${ex*45}px)`;
+  ['p0','p1','p2','p3','p4'].forEach((id,i)=>pop($(id),t,3.35+i*.07,0,30));
+  // highlight moves Home -> Shorts
+  const hm=ioC(seg(t,4.5,4.85));const p0=$('p0'),p1=$('p1');
+  const x=lerp(p0.offsetLeft,p1.offsetLeft,hm),wd=lerp(p0.offsetWidth,p1.offsetWidth,hm);
+  const hp=seg(t,3.55,3.9);const hi=$('pillHi');hi.style.left=x+'px';hi.style.top='250px';hi.style.width=wd+'px';hi.style.opacity=hp;hi.style.transform=`scale(${lerp(.6,1,oB(hp))})`;
+  [p0,p1].forEach((el,i)=>{const on=i===0?1-hm:hm;el.style.background=on>.5?'transparent':'#1e1e24';el.style.borderColor=on>.5?'transparent':'';el.style.color=on>.5?'#fff':'#cfcfd6';el.style.zIndex=2});
+  ['v0','v1','v2'].forEach((id,i)=>pop($(id),t,3.6+i*.12,0,80));
+  pop($('cont'),t,4.9,0,60);
+  const bp=lerp(30,72,ioC(seg(t,5.2,6.3)));$('barFill').style.width=bp+'%';$('pct').textContent=Math.round(bp)+'%';
+ }
+ // ---------- C: comments 6.6 - 9.3
+ const C=$('sC');vis(C,t>6.6&&t<9.35);
+ if(t>6.6&&t<9.35){
+  const e=oC(seg(t,6.6,7.0));
+  const z=ioC(seg(t,8.0,8.9));
+  C.style.transformOrigin='1292px 846px';
+  C.style.transform=`translate(${(1-e)*1000+(960-1292)*z}px,${(540-846)*z}px) scale(${lerp(1,2.6,z)})`;
+  const out=seg(t,9.0,9.35);
+  C.style.filter=`blur(${Math.max((1-e)*45,out*30)}px)`;C.style.opacity=1-out;
+  ['c0','c1','c2'].forEach((id,i)=>pop($(id),t,7.05+i*.18,40,10));
+  const g=seg(t,8.6,8.75),g2=seg(t,8.75,9.1);
+  const s=$('send');s.style.transform=`scale(${1-.12*g+.12*g2})`;s.style.boxShadow=`0 0 ${10+60*g}px ${8*g}px rgba(255,31,61,${.3+.6*g*(1-g2*.5)})`;
+ }
+ // ---------- D: lines 9.3 - 14.6
+ const D=$('sD');vis(D,t>9.3&&t<14.7);
+ ['l0','l1','l2'].forEach((id,i)=>{
+  const s=9.4+i*1.75,el=$(id);
+  const a=seg(t,s,s+.4),b=seg(t,s+1.35,s+1.7);
+  el.style.opacity=oC(a)*(1-b);
+  el.style.filter=`blur(${(1-oC(a))*22+b*22}px)`;
+  el.style.letterSpacing=`${lerp(6,-2.5,oC(a))+b*4}px`;
+  el.style.transform=`scale(${lerp(.96,1.03,seg(t,s,s+1.7))})`;
+ });
+ // ---------- E: logo 14.6 - 17
+ const E=$('sE');vis(E,t>14.55);
+ if(t>14.55){
+  const ic=$('logoIcon'),wd=$('word');
+  const p=seg(t,14.65,15.1);
+  const slide=ioC(seg(t,15.3,15.85));
+  const wordW=600; // approx wordmark width
+  const total=170+30+wordW,left0=960-total/2;
+  ic.style.transform=`translateX(${lerp(0,left0+85-960,slide)}px) scale(${oB(p)})`;
+  ic.style.opacity=clamp(p*3);
+  wd.style.left=(left0+200)+'px';
+  wd.style.clipPath=`inset(0 ${100-slide*100}% 0 0)`;
+  wd.style.opacity=slide;
+  $('disc').style.opacity=seg(t,15.9,16.3)*.9;
+ }
+ $('fade').style.opacity=seg(t,16.75,17.0)*.0+0;
+};
+window.render(0);
+</script>
+</body></html>
