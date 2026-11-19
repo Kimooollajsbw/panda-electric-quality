@@ -1,25 +1,23 @@
 package com.panda.realsize
 
-import android.Manifest
 import android.annotation.SuppressLint
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Matrix as GMatrix
 import android.graphics.Paint
+import android.graphics.PorterDuff
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.opengl.GLES11Ext
-import android.opengl.GLES20
-import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Base64
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.PixelCopy
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
@@ -29,21 +27,19 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.google.android.filament.View as FilamentView
 import com.google.ar.core.Anchor
-import com.google.ar.core.ArCoreApk
-import com.google.ar.core.Camera
 import com.google.ar.core.Config
-import com.google.ar.core.Coordinates2d
 import com.google.ar.core.DepthPoint
 import com.google.ar.core.Frame
 import com.google.ar.core.HitResult
 import com.google.ar.core.Plane
 import com.google.ar.core.Point
+import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingFailureReason
 import com.google.ar.core.TrackingState
@@ -53,16 +49,21 @@ import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException
 import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
+import dev.romainguy.kotlin.math.Float4
+import dev.romainguy.kotlin.math.Mat4
+import io.github.sceneview.ar.ARSceneView
+import io.github.sceneview.ar.scene.PlaneRenderer
+import io.github.sceneview.node.ModelNode
+import io.github.sceneview.node.Node
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.nio.FloatBuffer
-import java.util.concurrent.ConcurrentLinkedQueue
-import javax.microedition.khronos.egl.EGLConfig
-import javax.microedition.khronos.opengles.GL10
+import java.util.Locale
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.max
@@ -71,127 +72,161 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Live camera mode. ARCore finds walls and ceilings; each product is drawn as a flat picture
- * of its real width and height (millimetres from the catalogue) pinned to the surface.
+ * Live camera mode on a physically based 3D engine (Filament through SceneView).
+ *
+ * ARCore finds walls and ceilings. Each product is a real 3D model built from its photo at its
+ * catalogue size (see [ProductModels]): it has thickness, casts a soft shadow, reflects the room
+ * (ARCore Environmental HDR light estimation), and its lamp glows when the light is on.
  */
-class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
+class ArActivity : AppCompatActivity() {
 
     // ---------- catalogue handed over by the photo-mode page ----------
-    class Variant(val label: String, val png: ByteArray) {
-        val bitmap: Bitmap? by lazy { BitmapFactory.decodeByteArray(png, 0, png.size) }
+    class Variant(val label: String, private val imageBytes: ByteArray) {
+        val bitmap: Bitmap? by lazy { BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size) }
     }
 
-    class Product(val id: String, val name: String, val wMm: Float, val hMm: Float, val lens: Float, val variants: List<Variant>)
+    class Product(
+        val id: String,
+        val name: String,
+        val widthMm: Float,
+        val heightMm: Float,
+        val category: String,
+        val round: Boolean,
+        val lensFraction: Float,
+        val variants: List<Variant>
+    ) {
+        val spec = ProductModels.Spec(widthMm, heightMm, category, round, lensFraction)
+    }
 
-    class Item(
+    class PlacedItem(
         val product: Product,
         var variant: Int,
-        var anchor: Anchor,
-        var up: FloatArray?,          // fixed "up" direction for floors/ceilings, null on walls
-        var rot: Int = 0,
-        val model: FloatArray = FloatArray(16),
-        var visible: Boolean = false
+        var anchor: Anchor?,
+        var upHint: FloatArray?,           // fixed "up" direction on floors and ceilings, null on walls
+        val rootNode: Node,
+        var rotationDegrees: Float = 0f,
+        var modelNode: ModelNode? = null,
+        var modelKey: String = "",
+        var frameNode: ModelNode? = null,
+        var dragPose: Pose? = null,
+        var shownTranslation: FloatArray? = null,
+        val worldMatrix: FloatArray = FloatArray(16),
+        var onScreen: Boolean = false
     )
 
     private var products: List<Product> = emptyList()
-    @Volatile private var lightMode = 0   // 0 warm, 1 white, 2 off
-    private val lightNames = arrayOf("نور وورم", "نور أبيض", "مطفي")
-    private val ambient = floatArrayOf(1f, 1f, 1f)
-    private var glowProg = 0
-    private lateinit var btnLight: TextView
-    private var current = 0
     private val variantOf = HashMap<String, Int>()
+    private var currentProduct = 0
+    private var lightState = ProductModels.LightState.WARM
+    private val lightNames = mapOf(
+        ProductModels.LightState.WARM to "نور وورم",
+        ProductModels.LightState.WHITE to "نور أبيض",
+        ProductModels.LightState.OFF to "مطفي"
+    )
 
-    // ---------- AR + GL state ----------
-    private lateinit var surface: GLSurfaceView
-    private var session: Session? = null
-    private var installRequested = false
-    private var textureGiven = false
-    private var camTex = 0
-    private var viewW = 1
-    private var viewH = 1
-    private val items = ArrayList<Item>()
-    private var selected: Item? = null
-    private var dragging: Item? = null
-    private val glQueue = ConcurrentLinkedQueue<() -> Unit>()
-    private val textures = HashMap<String, Int>()
-    @Volatile private var captureRequested = false
+    // ---------- AR scene ----------
+    private lateinit var sceneView: ARSceneView
+    private val items = ArrayList<PlacedItem>()
+    private var selectedItem: PlacedItem? = null
+    private var draggedItem: PlacedItem? = null
+    private var lastFrame: Frame? = null
+    private var depthSupported = false
+    private var occlusionOn = false
+    private var capturing = false
+    private var activityGone = false
 
-    private val proj = FloatArray(16)
-    private val view = FloatArray(16)
-    private val vp = FloatArray(16)
-    private val mvp = FloatArray(16)
+    private val modelBuilder: ExecutorService = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val modelBytesCache = HashMap<String, ByteArray>()
+    private val modelsBeingBuilt = HashSet<String>()
 
-    private var bgProg = 0
-    private var colProg = 0
-    private var texProg = 0
-    private val bgPos: FloatBuffer = GlUtil.floats(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f)
-    private val bgTexIn: FloatBuffer = GlUtil.floats(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f)
-    private val bgTex: FloatBuffer = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
-    private val quadUv: FloatBuffer = GlUtil.floats(0f, 0f, 1f, 0f, 0f, 1f, 1f, 1f)
-    private val quadBuf: FloatBuffer = ByteBuffer.allocateDirect(12 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
-    private fun quad(vararg v: Float): FloatBuffer { quadBuf.clear(); quadBuf.put(v); quadBuf.position(0); return quadBuf }
-    private val dotBuf = FloatArray(3000)
-    private var scratch: FloatBuffer = ByteBuffer.allocateDirect(4096 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+    private val viewMatrix = FloatArray(16)
+    private val projectionMatrix = FloatArray(16)
+    private val viewProjection = FloatArray(16)
 
     // ---------- views ----------
-    private lateinit var hint: TextView
-    private lateinit var info: TextView
-    private lateinit var strip: LinearLayout
-    private lateinit var btnColor: TextView
+    private lateinit var hintView: TextView
+    private lateinit var infoView: TextView
+    private lateinit var productStrip: LinearLayout
+    private lateinit var colorButton: TextView
+    private lateinit var lightButton: TextView
+    private lateinit var occlusionChip: TextView
     private var lastHint = ""
     private var lastInfo = ""
-    private var lastUiMs = 0L
+    private var lastTextUpdateMs = 0L
 
-    private val askCamera = registerForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
-        if (!ok) {
-            Toast.makeText(this, "الكاميرا اللايف محتاجة إذن الكاميرا.", Toast.LENGTH_LONG).show()
-            finish()
-        }
-    }
+    // ---------- touch state ----------
+    private var touchSlopPx = 0
+    private var downX = 0f
+    private var downY = 0f
+    private var fingerMoved = false
+    private var twoFingerAngle: Float? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         products = loadProducts()
+        touchSlopPx = ViewConfiguration.get(this).scaledTouchSlop
         buildUi()
         if (products.isEmpty()) setHint("ما وصلتش قائمة المنتجات. ارجع وافتح الكاميرا اللايف تاني.")
+    }
+
+    override fun onDestroy() {
+        activityGone = true
+        modelBuilder.shutdownNow()
+        super.onDestroy()
     }
 
     // ---------- catalogue ----------
     private fun loadProducts(): List<Product> {
         return try {
-            val j = JSONObject(File(cacheDir, "ar_products.json").readText())
-            val arr = j.getJSONArray("products")
-            val out = ArrayList<Product>()
-            for (i in 0 until arr.length()) {
-                val p = arr.getJSONObject(i)
-                val vs = p.getJSONArray("variants")
-                val list = ArrayList<Variant>()
-                for (k in 0 until vs.length()) {
-                    val v = vs.getJSONObject(k)
-                    list.add(Variant(v.optString("label"), Base64.decode(v.getString("png"), Base64.DEFAULT)))
+            val payload = JSONObject(File(cacheDir, "ar_products.json").readText())
+            val productArray = payload.getJSONArray("products")
+            val loaded = ArrayList<Product>()
+            for (productIndex in 0 until productArray.length()) {
+                val entry = productArray.getJSONObject(productIndex)
+                val variantArray = entry.getJSONArray("variants")
+                val variants = ArrayList<Variant>()
+                for (variantIndex in 0 until variantArray.length()) {
+                    val variantEntry = variantArray.getJSONObject(variantIndex)
+                    variants.add(Variant(variantEntry.optString("label"), Base64.decode(variantEntry.getString("png"), Base64.DEFAULT)))
                 }
-                val w = p.getDouble("w").toFloat()
-                val h = p.getDouble("h").toFloat()
-                if (list.isNotEmpty() && w > 0 && h > 0) {
-                    out.add(Product(p.getString("id"), p.optString("name"), w, h, p.optDouble("light", 0.0).toFloat(), list))
-                    variantOf[p.getString("id")] = p.optInt("variant", 0).coerceIn(0, list.size - 1)
-                }
+                val widthMm = entry.getDouble("w").toFloat()
+                val heightMm = entry.getDouble("h").toFloat()
+                if (variants.isEmpty() || widthMm <= 0f || heightMm <= 0f) continue
+                val id = entry.getString("id")
+                loaded.add(
+                    Product(
+                        id = id,
+                        name = entry.optString("name"),
+                        widthMm = widthMm,
+                        heightMm = heightMm,
+                        category = entry.optString("cat", "mine"),
+                        round = entry.optString("shape") == "round",
+                        lensFraction = entry.optDouble("light", 0.0).toFloat(),
+                        variants = variants
+                    )
+                )
+                variantOf[id] = entry.optInt("variant", 0).coerceIn(0, variants.size - 1)
             }
-            lightMode = when (j.optString("light")) { "white" -> 1; "off" -> 2; else -> 0 }
-            val start = j.optString("start")
-            current = out.indexOfFirst { it.id == start }.coerceAtLeast(0)
-            out
+            lightState = when (payload.optString("light")) {
+                "white" -> ProductModels.LightState.WHITE
+                "off" -> ProductModels.LightState.OFF
+                else -> ProductModels.LightState.WARM
+            }
+            val startId = payload.optString("start")
+            currentProduct = loaded.indexOfFirst { it.id == startId }.coerceAtLeast(0)
+            loaded
         } catch (e: Exception) {
             emptyList()
         }
     }
 
-    private fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, resources.displayMetrics)
+    // ---------- UI ----------
+    private fun dp(value: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, resources.displayMetrics)
 
-    private fun pill(bg: Int, stroke: Int = 0, radius: Float = 14f) = GradientDrawable().apply {
-        setColor(bg); cornerRadius = dp(radius)
+    private fun pill(background: Int, stroke: Int = 0, radius: Float = 14f) = GradientDrawable().apply {
+        setColor(background); cornerRadius = dp(radius)
         if (stroke != 0) setStroke(dp(2f).toInt(), stroke)
     }
 
@@ -199,48 +234,72 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
     private fun buildUi() {
         val root = FrameLayout(this)
         root.layoutDirection = View.LAYOUT_DIRECTION_RTL
-        surface = GLSurfaceView(this).apply {
-            preserveEGLContextOnPause = true
-            setEGLContextClientVersion(2)
-            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-            setRenderer(this@ArActivity)
-            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-            setWillNotDraw(false)
-        }
-        root.addView(surface, FrameLayout.LayoutParams(-1, -1))
+
+        sceneView = ARSceneView(
+            context = this,
+            sharedLifecycle = lifecycle,
+            sharedActivity = this,
+            sessionConfiguration = { session, config -> configureSession(session, config) },
+            onSessionCreated = { session -> onSessionReady(session) },
+            onSessionFailed = { exception -> onSessionError(exception) },
+            onSessionUpdated = { _, frame -> onArFrame(frame) }
+        )
+        setUpRendering()
+        root.addView(sceneView, FrameLayout.LayoutParams(-1, -1))
 
         val ink = ContextCompat.getColor(this, R.color.ink)
         val laser = ContextCompat.getColor(this, R.color.laser)
 
-        hint = TextView(this).apply {
+        hintView = TextView(this).apply {
             setTextColor(Color.WHITE); textSize = 14f; gravity = Gravity.CENTER
             background = pill(0xCC0F1114.toInt())
             setPadding(dp(14f).toInt(), dp(8f).toInt(), dp(14f).toInt(), dp(8f).toInt())
             text = "جاري تشغيل الكاميرا…"
         }
-        root.addView(hint, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply {
+        root.addView(hintView, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply {
             topMargin = dp(16f).toInt(); leftMargin = dp(16f).toInt(); rightMargin = dp(16f).toInt()
         })
 
-        val bottom = LinearLayout(this).apply {
+        val bottomPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(0xE6181A1E.toInt())
             setPadding(0, dp(8f).toInt(), 0, dp(10f).toInt())
         }
-        info = TextView(this).apply {
+
+        val chipRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12f).toInt(), 0, dp(12f).toInt(), dp(6f).toInt())
+        }
+        fun chip(label: String, onClick: () -> Unit): TextView {
+            val chipView = TextView(this).apply {
+                text = label; textSize = 12f; gravity = Gravity.CENTER
+                setTextColor(Color.WHITE)
+                background = pill(0x33FFFFFF, 0, 16f)
+                setPadding(dp(12f).toInt(), dp(5f).toInt(), dp(12f).toInt(), dp(5f).toInt())
+                setOnClickListener { onClick() }
+            }
+            chipRow.addView(chipView, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8f).toInt() })
+            return chipView
+        }
+        chip("امسح الكل") { for (item in ArrayList(items)) removeItem(item) }
+        occlusionChip = chip("الحجب: مقفول") { toggleOcclusion() }
+        occlusionChip.visibility = View.GONE
+        bottomPanel.addView(chipRow)
+
+        infoView = TextView(this).apply {
             setTextColor(Color.WHITE); textSize = 14f
             setPadding(dp(16f).toInt(), 0, dp(16f).toInt(), dp(6f).toInt())
             typeface = Typeface.DEFAULT_BOLD
             text = "اختار منتج من تحت، وبعدين دوس على الحيطة أو السقف."
         }
-        bottom.addView(info)
+        bottomPanel.addView(infoView)
 
-        val actions = LinearLayout(this).apply {
+        val actionRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(12f).toInt(), 0, dp(12f).toInt(), dp(8f).toInt())
         }
         fun action(label: String, accent: Boolean = false, onClick: () -> Unit): TextView {
-            val b = TextView(this).apply {
+            val button = TextView(this).apply {
                 text = label; textSize = 13.5f; gravity = Gravity.CENTER
                 setTextColor(if (accent) Color.WHITE else ink)
                 typeface = Typeface.DEFAULT_BOLD
@@ -249,643 +308,536 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
                 setPadding(dp(4f).toInt(), 0, dp(4f).toInt(), 0)
                 setOnClickListener { onClick() }
             }
-            actions.addView(b, LinearLayout.LayoutParams(0, dp(44f).toInt(), 1f).apply {
+            actionRow.addView(button, LinearLayout.LayoutParams(0, dp(44f).toInt(), 1f).apply {
                 marginStart = dp(3f).toInt(); marginEnd = dp(3f).toInt()
             })
-            return b
+            return button
         }
-        action("لف 90°") { glQueue.add { selected?.let { it.rot = (it.rot + 90) % 360 } } }
-        btnColor = action("اللون") { cycleColor() }
-        btnLight = action(lightNames[lightMode]) {
-            lightMode = (lightMode + 1) % 3
-            btnLight.text = lightNames[lightMode]
-        }
-        action("امسح") { glQueue.add { selected?.let { removeItem(it) } } }
-        action("امسح الكل") { glQueue.add { for (it in ArrayList(items)) removeItem(it) } }
-        action("صوّر", accent = true) { captureRequested = true }
-        bottom.addView(actions)
+        action("لف 90°") { selectedItem?.let { item -> item.rotationDegrees = (item.rotationDegrees + 90f) % 360f } }
+        colorButton = action("اللون") { cycleColor() }
+        lightButton = action(lightNames.getValue(lightState)) { cycleLight() }
+        action("امسح") { selectedItem?.let { item -> removeItem(item) } }
+        action("صوّر", accent = true) { capture() }
+        bottomPanel.addView(actionRow)
 
         val scroller = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
-        strip = LinearLayout(this).apply {
+        productStrip = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(12f).toInt(), 0, dp(12f).toInt(), 0)
         }
-        scroller.addView(strip)
-        bottom.addView(scroller)
-        root.addView(bottom, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
+        scroller.addView(productStrip)
+        bottomPanel.addView(scroller)
+        root.addView(bottomPanel, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
+
         // keep the hint and the buttons clear of the status and navigation bars
         ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
-            val b = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
-            (hint.layoutParams as FrameLayout.LayoutParams).topMargin = dp(16f).toInt() + b.top
-            hint.requestLayout()
-            bottom.setPadding(0, dp(8f).toInt(), 0, dp(10f).toInt() + b.bottom)
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            (hintView.layoutParams as FrameLayout.LayoutParams).topMargin = dp(16f).toInt() + bars.top
+            hintView.requestLayout()
+            bottomPanel.setPadding(0, dp(8f).toInt(), 0, dp(10f).toInt() + bars.bottom)
             insets
         }
         setContentView(root)
         renderStrip()
 
-        val slop = ViewConfiguration.get(this).scaledTouchSlop
-        var downX = 0f
-        var downY = 0f
-        var moved = false
-        surface.setOnTouchListener { _, e ->
-            val x = e.x
-            val y = e.y
-            when (e.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    downX = x; downY = y; moved = false
-                    glQueue.add { onDown(x, y) }
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    if (!moved && hypot(x - downX, y - downY) > slop) moved = true
-                    if (moved) glQueue.add { onMove(x, y) }
-                }
-                MotionEvent.ACTION_UP -> {
-                    val wasMoved = moved
-                    glQueue.add { onUp(x, y, wasMoved) }
-                }
-                MotionEvent.ACTION_CANCEL -> glQueue.add { dragging = null }
-            }
+        sceneView.onTouchEvent = { event, _ ->
+            handleTouch(event)
             true
         }
     }
 
-    private fun mmText(p: Product): String {
-        fun cm(v: Float) = if (abs(v / 10f - (v / 10f).roundToInt()) < 0.05f) "${(v / 10f).roundToInt()}" else String.format(java.util.Locale.US, "%.1f", v / 10f)
-        return if (abs(p.wMm - p.hMm) < 0.5f) "${cm(p.wMm)} سم" else "${cm(p.wMm)} × ${cm(p.hMm)} سم"
+    private fun mmText(product: Product): String {
+        fun centimetres(valueMm: Float): String {
+            val valueCm = valueMm / 10f
+            return if (abs(valueCm - valueCm.roundToInt()) < 0.05f) "${valueCm.roundToInt()}" else String.format(Locale.US, "%.1f", valueCm)
+        }
+        return if (abs(product.widthMm - product.heightMm) < 0.5f) "${centimetres(product.widthMm)} سم"
+        else "${centimetres(product.widthMm)} × ${centimetres(product.heightMm)} سم"
     }
 
     private fun renderStrip() {
-        strip.removeAllViews()
+        productStrip.removeAllViews()
         val ink = ContextCompat.getColor(this, R.color.ink)
         val laser = ContextCompat.getColor(this, R.color.laser)
-        products.forEachIndexed { i, p ->
+        products.forEachIndexed { productIndex, product ->
             val box = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
-                background = pill(Color.WHITE, if (i == current) laser else 0, 10f)
+                background = pill(Color.WHITE, if (productIndex == currentProduct) laser else 0, 10f)
                 setPadding(dp(6f).toInt(), dp(6f).toInt(), dp(6f).toInt(), dp(6f).toInt())
-                setOnClickListener { current = i; renderStrip(); updateColorButton() }
+                setOnClickListener { currentProduct = productIndex; renderStrip() }
             }
-            val img = ImageView(this).apply {
+            val thumbnail = ImageView(this).apply {
                 scaleType = ImageView.ScaleType.FIT_CENTER
-                val v = p.variants[variantOf[p.id] ?: 0]
-                setImageBitmap(aspectBitmap(p, v))
+                setImageBitmap(aspectBitmap(product, product.variants[variantOf[product.id] ?: 0]))
                 setBackgroundColor(0xFFA3ABB4.toInt())
             }
-            box.addView(img, LinearLayout.LayoutParams(dp(84f).toInt(), dp(44f).toInt()))
+            box.addView(thumbnail, LinearLayout.LayoutParams(dp(84f).toInt(), dp(44f).toInt()))
             box.addView(TextView(this).apply {
-                text = p.name; textSize = 11.5f; setTextColor(ink); gravity = Gravity.CENTER
+                text = product.name; textSize = 11.5f; setTextColor(ink); gravity = Gravity.CENTER
                 maxLines = 2; typeface = Typeface.DEFAULT_BOLD
             }, LinearLayout.LayoutParams(dp(84f).toInt(), -2))
             box.addView(TextView(this).apply {
-                text = mmText(p); textSize = 10.5f; setTextColor(0xFF56606B.toInt()); gravity = Gravity.CENTER
+                text = mmText(product); textSize = 10.5f; setTextColor(0xFF56606B.toInt()); gravity = Gravity.CENTER
             })
-            strip.addView(box, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8f).toInt() })
+            productStrip.addView(box, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8f).toInt() })
         }
         updateColorButton()
     }
 
     /** The page sends square-ish power-of-two pictures; this restores the real proportions for the thumbnail. */
-    private fun aspectBitmap(p: Product, v: Variant): Bitmap? {
-        val b = v.bitmap ?: return null
-        val long = 200f
-        val w = if (p.wMm >= p.hMm) long else long * p.wMm / p.hMm
-        val h = if (p.hMm > p.wMm) long else long * p.hMm / p.wMm
-        return Bitmap.createScaledBitmap(b, max(8, w.roundToInt()), max(8, h.roundToInt()), true)
+    private fun aspectBitmap(product: Product, variant: Variant): Bitmap? {
+        val source = variant.bitmap ?: return null
+        val longSide = 200f
+        val thumbWidth = if (product.widthMm >= product.heightMm) longSide else longSide * product.widthMm / product.heightMm
+        val thumbHeight = if (product.heightMm > product.widthMm) longSide else longSide * product.heightMm / product.widthMm
+        return Bitmap.createScaledBitmap(source, max(8, thumbWidth.roundToInt()), max(8, thumbHeight.roundToInt()), true)
     }
 
     private fun updateColorButton() {
-        val p = products.getOrNull(current)
-        val n = p?.variants?.size ?: 0
-        btnColor.alpha = if (n > 1) 1f else 0.4f
-        btnColor.isEnabled = n > 1
-        if (p != null && n > 1) btnColor.text = p.variants[variantOf[p.id] ?: 0].label.ifBlank { "اللون" }
-        else btnColor.text = "اللون"
+        val product = products.getOrNull(currentProduct)
+        val variantCount = product?.variants?.size ?: 0
+        colorButton.alpha = if (variantCount > 1) 1f else 0.4f
+        colorButton.isEnabled = variantCount > 1
+        colorButton.text = if (product != null && variantCount > 1) {
+            product.variants[variantOf[product.id] ?: 0].label.ifBlank { "اللون" }
+        } else "اللون"
     }
 
     private fun cycleColor() {
-        val p = products.getOrNull(current) ?: return
-        if (p.variants.size < 2) return
-        val next = ((variantOf[p.id] ?: 0) + 1) % p.variants.size
-        variantOf[p.id] = next
-        glQueue.add {
-            val sel = selected
-            if (sel != null && sel.product === p) sel.variant = next
+        val product = products.getOrNull(currentProduct) ?: return
+        if (product.variants.size < 2) return
+        val nextVariant = ((variantOf[product.id] ?: 0) + 1) % product.variants.size
+        variantOf[product.id] = nextVariant
+        selectedItem?.let { item ->
+            if (item.product === product) {
+                item.variant = nextVariant
+                requestModel(item)
+            }
         }
         renderStrip()
     }
 
-    // ---------- lifecycle ----------
-    override fun onResume() {
-        super.onResume()
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            askCamera.launch(Manifest.permission.CAMERA)
-            return
+    private fun cycleLight() {
+        lightState = when (lightState) {
+            ProductModels.LightState.WARM -> ProductModels.LightState.WHITE
+            ProductModels.LightState.WHITE -> ProductModels.LightState.OFF
+            ProductModels.LightState.OFF -> ProductModels.LightState.WARM
         }
-        if (session == null) {
-            var message: String? = null
-            try {
-                when (ArCoreApk.getInstance().requestInstall(this, !installRequested)) {
-                    ArCoreApk.InstallStatus.INSTALL_REQUESTED -> {
-                        installRequested = true
-                        return
-                    }
-                    else -> {}
-                }
-                val s = Session(this)
-                val c = Config(s)
-                c.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-                c.focusMode = Config.FocusMode.AUTO
-                c.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                c.lightEstimationMode = Config.LightEstimationMode.AMBIENT_INTENSITY
-                if (s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) c.depthMode = Config.DepthMode.AUTOMATIC
-                s.configure(c)
-                session = s
-                textureGiven = false
-            } catch (e: UnavailableArcoreNotInstalledException) {
-                message = "محتاج تثبّت خدمات Google Play للواقع المعزز (ARCore) من المتجر."
-            } catch (e: UnavailableUserDeclinedInstallationException) {
-                message = "الكاميرا اللايف محتاجة تثبيت ARCore. تقدر تستخدم وضع الصورة."
-            } catch (e: UnavailableApkTooOldException) {
-                message = "حدّث خدمات Google Play للواقع المعزز (ARCore) من المتجر."
-            } catch (e: UnavailableSdkTooOldException) {
-                message = "التطبيق محتاج تحديث."
-            } catch (e: UnavailableDeviceNotCompatibleException) {
-                message = "الموبايل ده مش بيدعم الكاميرا اللايف (ARCore). استخدم وضع الصورة."
-            } catch (e: Exception) {
-                message = "الكاميرا اللايف ما اشتغلتش: ${e.message}"
+        lightButton.text = lightNames.getValue(lightState)
+        for (item in items) requestModel(item)
+    }
+
+    private fun toggleOcclusion() {
+        occlusionOn = !occlusionOn
+        sceneView.cameraStream?.isDepthOcclusionEnabled = occlusionOn
+        occlusionChip.text = if (occlusionOn) "الحجب: شغال" else "الحجب: مقفول"
+        if (occlusionOn) uiToast("دلوقتي أي حاجة قدّام المنتج (زي إيدك) بتغطيه.")
+    }
+
+    // ---------- AR session and rendering ----------
+    private fun configureSession(session: Session, config: Config) {
+        config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+        config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
+        config.depthMode = if (session.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) Config.DepthMode.AUTOMATIC else Config.DepthMode.DISABLED
+        config.instantPlacementMode = Config.InstantPlacementMode.DISABLED
+        config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+    }
+
+    /** Shadows, anti-aliased edges and a soft bloom around lit lamps. */
+    private fun setUpRendering() {
+        sceneView.planeRenderer.planeRendererMode = PlaneRenderer.PlaneRendererMode.RENDER_ALL
+        sceneView.planeRenderer.isShadowReceiver = true
+        sceneView.view.apply {
+            setShadowingEnabled(true)
+            shadowType = FilamentView.ShadowType.PCF
+            multiSampleAntiAliasingOptions = multiSampleAntiAliasingOptions.apply {
+                enabled = true
+                sampleCount = 4
             }
-            if (message != null) {
-                setHint(message)
-                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-                return
+            bloomOptions = bloomOptions.apply {
+                enabled = true
+                strength = 0.12f
+                threshold = true
             }
         }
-        try {
-            session?.resume()
-        } catch (e: CameraNotAvailableException) {
-            setHint("الكاميرا مشغولة. اقفل أي تطبيق تاني بيستخدمها وارجع.")
-            session = null
-            return
-        }
-        surface.onResume()
     }
 
-    override fun onPause() {
-        super.onPause()
-        if (session != null) {
-            surface.onPause()
-            session?.pause()
+    private fun onSessionReady(session: Session) {
+        depthSupported = session.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
+        runOnUiThread {
+            if (::occlusionChip.isInitialized) occlusionChip.visibility = if (depthSupported) View.VISIBLE else View.GONE
         }
     }
 
-    override fun onDestroy() {
-        session?.close()
-        session = null
-        super.onDestroy()
-    }
-
-    // ---------- GL ----------
-    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        GLES20.glClearColor(0f, 0f, 0f, 1f)
-        camTex = GlUtil.externalTexture()
-        textureGiven = false
-        textures.clear()
-        bgProg = GlUtil.program(
-            """
-            attribute vec4 a_Pos; attribute vec2 a_Uv; varying vec2 v_Uv;
-            void main(){ gl_Position = a_Pos; v_Uv = a_Uv; }
-            """.trimIndent(),
-            """
-            #extension GL_OES_EGL_image_external : require
-            precision mediump float; varying vec2 v_Uv; uniform samplerExternalOES u_Tex;
-            void main(){ gl_FragColor = texture2D(u_Tex, v_Uv); }
-            """.trimIndent()
-        )
-        colProg = GlUtil.program(
-            """
-            uniform mat4 u_Mvp; attribute vec4 a_Pos;
-            void main(){ gl_Position = u_Mvp * a_Pos; gl_PointSize = 6.0; }
-            """.trimIndent(),
-            """
-            precision mediump float; uniform vec4 u_Color;
-            void main(){ gl_FragColor = u_Color; }
-            """.trimIndent()
-        )
-        texProg = GlUtil.program(
-            """
-            uniform mat4 u_Mvp; attribute vec4 a_Pos; attribute vec2 a_Uv; varying vec2 v_Uv;
-            void main(){ gl_Position = u_Mvp * a_Pos; v_Uv = a_Uv; }
-            """.trimIndent(),
-            """
-            precision mediump float; varying vec2 v_Uv; uniform sampler2D u_Tex; uniform vec3 u_Mul;
-            void main(){ vec4 c = texture2D(u_Tex, v_Uv); gl_FragColor = vec4(c.rgb * u_Mul, c.a); }
-            """.trimIndent()
-        )
-        glowProg = GlUtil.program(
-            """
-            uniform mat4 u_Mvp; attribute vec4 a_Pos; attribute vec2 a_Uv; varying vec2 v_Uv;
-            void main(){ gl_Position = u_Mvp * a_Pos; v_Uv = a_Uv; }
-            """.trimIndent(),
-            """
-            precision mediump float; varying vec2 v_Uv; uniform vec3 u_Color; uniform float u_Sharp; uniform float u_Gain;
-            void main(){ float d = distance(v_Uv, vec2(0.5)) * 2.0; float a = exp(-d * d * u_Sharp) * u_Gain;
-              gl_FragColor = vec4(u_Color * a, 1.0); }
-            """.trimIndent()
-        )
-    }
-
-    @Suppress("DEPRECATION")
-    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        viewW = width
-        viewH = height
-        GLES20.glViewport(0, 0, width, height)
-        val rotation = windowManager.defaultDisplay.rotation
-        session?.setDisplayGeometry(rotation, width, height)
-    }
-
-    override fun onDrawFrame(gl: GL10?) {
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
-        val s = session ?: return
-        if (!textureGiven) {
-            s.setCameraTextureName(camTex)
-            @Suppress("DEPRECATION")
-            s.setDisplayGeometry(windowManager.defaultDisplay.rotation, viewW, viewH)
-            textureGiven = true
+    private fun onSessionError(exception: Exception) {
+        val message = when (exception) {
+            is UnavailableArcoreNotInstalledException -> "محتاج تثبّت خدمات Google Play للواقع المعزز (ARCore) من المتجر."
+            is UnavailableUserDeclinedInstallationException -> "الكاميرا اللايف محتاجة تثبيت ARCore. تقدر تستخدم وضع الصورة."
+            is UnavailableApkTooOldException -> "حدّث خدمات Google Play للواقع المعزز (ARCore) من المتجر."
+            is UnavailableSdkTooOldException -> "التطبيق محتاج تحديث."
+            is UnavailableDeviceNotCompatibleException -> "الموبايل ده مش بيدعم الكاميرا اللايف (ARCore). استخدم وضع الصورة."
+            is CameraNotAvailableException -> "الكاميرا مشغولة. اقفل أي تطبيق تاني بيستخدمها وارجع."
+            is SecurityException -> "الكاميرا اللايف محتاجة إذن الكاميرا."
+            else -> "الكاميرا اللايف ما اشتغلتش: ${exception.message}"
         }
-        val frame: Frame = try {
-            s.update()
-        } catch (e: Exception) {
-            return
-        }
-        val camera = frame.camera
-        drawBackground(frame)
+        setHint(message)
+        uiToast(message)
+    }
 
-        camera.getProjectionMatrix(proj, 0, 0.05f, 60f)
-        camera.getViewMatrix(view, 0)
-        Matrix.multiplyMM(vp, 0, proj, 0, view, 0)
-
-        val tracking = camera.trackingState == TrackingState.TRACKING
+    /** Runs once per camera frame on the main thread, before the scene is drawn. */
+    private fun onArFrame(frame: Frame) {
         lastFrame = frame
-        // dim and tint the studio photos to the room's light
-        runCatching {
-            val le = frame.lightEstimate
-            if (le.state == com.google.ar.core.LightEstimate.State.VALID) {
-                val cc = FloatArray(4)
-                le.getColorCorrection(cc, 0)
-                val k = cc[3] / 0.466f
-                for (i in 0..2) ambient[i] = (cc[i] * k).coerceIn(0.3f, 1.15f)
-            }
+        val camera = frame.camera
+        val tracking = camera.trackingState == TrackingState.TRACKING
+        if (tracking) {
+            camera.getViewMatrix(viewMatrix, 0)
+            camera.getProjectionMatrix(projectionMatrix, 0, 0.05f, 60f)
+            Matrix.multiplyMM(viewProjection, 0, projectionMatrix, 0, viewMatrix, 0)
         }
-        while (true) {
-            val job = glQueue.poll() ?: break
-            runCatching { job.invoke() }
-        }
-
-        val planes = s.getAllTrackables(Plane::class.java).filter { it.trackingState == TrackingState.TRACKING && it.subsumedBy == null }
-        if (tracking && !captureRequested) drawPlanes(planes)
-        if (tracking) drawItems(camera)
-
-        if (captureRequested) {
-            captureRequested = false
-            capture()
-        }
-        updateTexts(camera, planes.size)
+        for (item in items) updateItemPlacement(item, tracking)
+        // the dotted surfaces help while placing; once something is placed they would spoil the picture
+        sceneView.planeRenderer.isVisible = !capturing && (items.isEmpty() || draggedItem != null)
+        updateTexts(frame)
     }
 
-    private fun drawBackground(frame: Frame) {
-        if (frame.hasDisplayGeometryChanged()) {
-            bgTexIn.position(0)
-            bgTex.position(0)
-            frame.transformCoordinates2d(
-                Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES, bgTexIn,
-                Coordinates2d.TEXTURE_NORMALIZED, bgTex
-            )
-        }
-        if (frame.timestamp == 0L) return
-        GLES20.glDisable(GLES20.GL_DEPTH_TEST)
-        GLES20.glDepthMask(false)
-        GLES20.glUseProgram(bgProg)
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
-        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, camTex)
-        GLES20.glUniform1i(GLES20.glGetUniformLocation(bgProg, "u_Tex"), 0)
-        val aPos = GLES20.glGetAttribLocation(bgProg, "a_Pos")
-        val aUv = GLES20.glGetAttribLocation(bgProg, "a_Uv")
-        bgPos.position(0); bgTex.position(0)
-        GLES20.glVertexAttribPointer(aPos, 2, GLES20.GL_FLOAT, false, 0, bgPos)
-        GLES20.glVertexAttribPointer(aUv, 2, GLES20.GL_FLOAT, false, 0, bgTex)
-        GLES20.glEnableVertexAttribArray(aPos)
-        GLES20.glEnableVertexAttribArray(aUv)
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
-        GLES20.glDisableVertexAttribArray(aPos)
-        GLES20.glDisableVertexAttribArray(aUv)
-        GLES20.glDepthMask(true)
+    private fun updateItemPlacement(item: PlacedItem, cameraTracking: Boolean) {
+        val anchor = item.anchor
+        val pose = item.dragPose ?: anchor?.takeIf { it.trackingState == TrackingState.TRACKING }?.pose
+        val visible = cameraTracking && pose != null
+        item.onScreen = visible
+        item.rootNode.isVisible = visible
+        if (pose == null) return
+        computeWorldMatrix(item, pose)
+        item.rootNode.worldTransform = Mat4(
+            Float4(item.worldMatrix[0], item.worldMatrix[1], item.worldMatrix[2], 0f),
+            Float4(item.worldMatrix[4], item.worldMatrix[5], item.worldMatrix[6], 0f),
+            Float4(item.worldMatrix[8], item.worldMatrix[9], item.worldMatrix[10], 0f),
+            Float4(item.worldMatrix[12], item.worldMatrix[13], item.worldMatrix[14], 1f)
+        )
+        item.frameNode?.isVisible = item === selectedItem && !capturing
     }
 
-    private fun scratchOf(n: Int): FloatBuffer {
-        if (scratch.capacity() < n) scratch = ByteBuffer.allocateDirect(n * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
-        scratch.clear()
-        return scratch
+    // ---------- placement maths ----------
+    private fun normalize(vector: FloatArray): FloatArray {
+        val length = sqrt(vector[0] * vector[0] + vector[1] * vector[1] + vector[2] * vector[2])
+        return if (length < 1e-6f) vector else floatArrayOf(vector[0] / length, vector[1] / length, vector[2] / length)
     }
 
-    private fun drawColor(model: FloatArray, xyz: FloatArray, count: Int, mode: Int, r: Float, g: Float, b: Float, a: Float) {
-        Matrix.multiplyMM(mvp, 0, vp, 0, model, 0)
-        GLES20.glUseProgram(colProg)
-        GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(colProg, "u_Mvp"), 1, false, mvp, 0)
-        GLES20.glUniform4f(GLES20.glGetUniformLocation(colProg, "u_Color"), r, g, b, a)
-        val buf = scratchOf(count * 3)
-        buf.put(xyz, 0, count * 3).position(0)
-        val aPos = GLES20.glGetAttribLocation(colProg, "a_Pos")
-        GLES20.glVertexAttribPointer(aPos, 3, GLES20.GL_FLOAT, false, 0, buf)
-        GLES20.glEnableVertexAttribArray(aPos)
-        GLES20.glDrawArrays(mode, 0, count)
-        GLES20.glDisableVertexAttribArray(aPos)
-    }
-
-    private fun drawPlanes(planes: List<Plane>) {
-        GLES20.glEnable(GLES20.GL_BLEND)
-        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
-        GLES20.glDisable(GLES20.GL_DEPTH_TEST)
-        val model = FloatArray(16)
-        for (p in planes) {
-            val poly = p.polygon ?: continue
-            val n = poly.limit() / 2
-            if (n < 3) continue
-            p.centerPose.toMatrix(model, 0)
-            val fan = FloatArray((n + 2) * 3)
-            for (i in 0..n) {
-                val k = i % n
-                fan[(i + 1) * 3] = poly.get(k * 2)
-                fan[(i + 1) * 3 + 2] = poly.get(k * 2 + 1)
-            }
-            val vertical = p.type == Plane.Type.VERTICAL
-            if (vertical) drawColor(model, fan, n + 2, GLES20.GL_TRIANGLE_FAN, 0.85f, 0.12f, 0.16f, 0.16f)
-            else drawColor(model, fan, n + 2, GLES20.GL_TRIANGLE_FAN, 1f, 1f, 1f, 0.14f)
-            val loop = FloatArray(n * 3)
-            for (i in 0 until n) { loop[i * 3] = poly.get(i * 2); loop[i * 3 + 2] = poly.get(i * 2 + 1) }
-            GLES20.glLineWidth(3f)
-            drawColor(model, loop, n, GLES20.GL_LINE_LOOP, 0.85f, 0.12f, 0.16f, 0.75f)
-            // a 10 cm dot grid so the scale of the surface reads at a glance
-            var dn = 0
-            val ext = max(p.extentX, p.extentZ) / 2f
-            var gx = -ext
-            while (gx <= ext && dn + 3 <= dotBuf.size) {
-                var gz = -ext
-                while (gz <= ext && dn + 3 <= dotBuf.size) {
-                    if (insidePoly(poly, n, gx, gz)) { dotBuf[dn] = gx; dotBuf[dn + 1] = 0f; dotBuf[dn + 2] = gz; dn += 3 }
-                    gz += 0.1f
-                }
-                gx += 0.1f
-            }
-            if (dn > 0) drawColor(model, dotBuf, dn / 3, GLES20.GL_POINTS, 1f, 1f, 1f, 0.55f)
-        }
-    }
-
-    private fun insidePoly(poly: FloatBuffer, n: Int, x: Float, z: Float): Boolean {
-        var inside = false
-        var j = n - 1
-        for (i in 0 until n) {
-            val xi = poly.get(i * 2); val zi = poly.get(i * 2 + 1)
-            val xj = poly.get(j * 2); val zj = poly.get(j * 2 + 1)
-            if ((zi > z) != (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) inside = !inside
-            j = i
-        }
-        return inside
-    }
-
-    private fun textureFor(it: Item): Int {
-        val v = it.product.variants[it.variant.coerceIn(0, it.product.variants.size - 1)]
-        val key = it.product.id + "#" + it.variant
-        textures[key]?.let { t -> return t }
-        val bmp = v.bitmap ?: return 0
-        val t = GlUtil.bitmapTexture(bmp)
-        textures[key] = t
-        return t
-    }
-
-    // ---------- item placement maths ----------
-    private fun norm(v: FloatArray): FloatArray {
-        val l = sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
-        return if (l < 1e-6f) v else floatArrayOf(v[0] / l, v[1] / l, v[2] / l)
-    }
-
-    private fun cross(a: FloatArray, b: FloatArray) = floatArrayOf(
-        a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]
+    private fun cross(first: FloatArray, second: FloatArray) = floatArrayOf(
+        first[1] * second[2] - first[2] * second[1],
+        first[2] * second[0] - first[0] * second[2],
+        first[0] * second[1] - first[1] * second[0]
     )
 
-    private fun dot(a: FloatArray, b: FloatArray) = a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+    private fun dot(first: FloatArray, second: FloatArray) = first[0] * second[0] + first[1] * second[1] + first[2] * second[2]
 
-    /** Builds the item's model matrix: x = right, y = up along the surface, z = surface normal. */
-    private fun computeModel(it: Item) {
-        val pose = it.anchor.pose
-        val n = norm(pose.yAxis)
-        val upHint = it.up ?: floatArrayOf(0f, 1f, 0f)
-        var u = floatArrayOf(upHint[0] - n[0] * dot(upHint, n), upHint[1] - n[1] * dot(upHint, n), upHint[2] - n[2] * dot(upHint, n))
-        if (sqrt(dot(u, u)) < 1e-3f) u = norm(cross(n, floatArrayOf(1f, 0f, 0f))) else u = norm(u)
-        var r = norm(cross(u, n))
-        val a = Math.toRadians(it.rot.toDouble())
-        val ca = cos(a).toFloat(); val sa = sin(a).toFloat()
-        val r2 = floatArrayOf(r[0] * ca + u[0] * sa, r[1] * ca + u[1] * sa, r[2] * ca + u[2] * sa)
-        val u2 = floatArrayOf(-r[0] * sa + u[0] * ca, -r[1] * sa + u[1] * ca, -r[2] * sa + u[2] * ca)
-        r = r2; u = u2
-        val t = pose.translation
-        val m = it.model
-        m[0] = r[0]; m[1] = r[1]; m[2] = r[2]; m[3] = 0f
-        m[4] = u[0]; m[5] = u[1]; m[6] = u[2]; m[7] = 0f
-        m[8] = n[0]; m[9] = n[1]; m[10] = n[2]; m[11] = 0f
-        m[12] = t[0] + n[0] * 0.002f; m[13] = t[1] + n[1] * 0.002f; m[14] = t[2] + n[2] * 0.002f; m[15] = 1f
-    }
+    /** Model axes: x = right, y = up along the surface, z = surface normal (towards the camera). */
+    private fun computeWorldMatrix(item: PlacedItem, pose: Pose) {
+        val normal = normalize(pose.yAxis)
+        val upHint = item.upHint ?: floatArrayOf(0f, 1f, 0f)
+        val alongNormal = dot(upHint, normal)
+        var up = floatArrayOf(upHint[0] - normal[0] * alongNormal, upHint[1] - normal[1] * alongNormal, upHint[2] - normal[2] * alongNormal)
+        up = if (sqrt(dot(up, up)) < 1e-3f) normalize(cross(normal, floatArrayOf(1f, 0f, 0f))) else normalize(up)
+        var right = normalize(cross(up, normal))
+        val angle = Math.toRadians(item.rotationDegrees.toDouble())
+        val cosine = cos(angle).toFloat()
+        val sine = sin(angle).toFloat()
+        val rotatedRight = floatArrayOf(right[0] * cosine + up[0] * sine, right[1] * cosine + up[1] * sine, right[2] * cosine + up[2] * sine)
+        val rotatedUp = floatArrayOf(-right[0] * sine + up[0] * cosine, -right[1] * sine + up[1] * cosine, -right[2] * sine + up[2] * cosine)
+        right = rotatedRight
+        up = rotatedUp
 
-    private fun halfSize(it: Item): Pair<Float, Float> = Pair(it.product.wMm / 2000f, it.product.hMm / 2000f)
+        val target = pose.translation
+        val shown = item.shownTranslation
+        val translation = if (item.dragPose != null && shown != null) {
+            // follow the finger smoothly instead of jumping with every noisy hit test
+            floatArrayOf(
+                shown[0] + (target[0] - shown[0]) * 0.45f,
+                shown[1] + (target[1] - shown[1]) * 0.45f,
+                shown[2] + (target[2] - shown[2]) * 0.45f
+            )
+        } else target
+        item.shownTranslation = translation
 
-    private fun drawItems(camera: Camera) {
-        GLES20.glEnable(GLES20.GL_BLEND)
-        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
-        GLES20.glDisable(GLES20.GL_DEPTH_TEST)
-        GLES20.glDisable(GLES20.GL_CULL_FACE)
-        for (it in items) {
-            it.visible = it.anchor.trackingState == TrackingState.TRACKING
-            if (!it.visible) continue
-            computeModel(it)
-            val (hw, hh) = halfSize(it)
-            val tex = textureFor(it)
-            if (tex == 0) continue
-            Matrix.multiplyMM(mvp, 0, vp, 0, it.model, 0)
-            GLES20.glUseProgram(texProg)
-            GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(texProg, "u_Mvp"), 1, false, mvp, 0)
-            GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
-            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tex)
-            GLES20.glUniform1i(GLES20.glGetUniformLocation(texProg, "u_Tex"), 0)
-            GLES20.glUniform3f(GLES20.glGetUniformLocation(texProg, "u_Mul"), ambient[0], ambient[1], ambient[2])
-            val pos = quad(-hw, hh, 0f, hw, hh, 0f, -hw, -hh, 0f, hw, -hh, 0f)
-            quadUv.position(0)
-            val aPos = GLES20.glGetAttribLocation(texProg, "a_Pos")
-            val aUv = GLES20.glGetAttribLocation(texProg, "a_Uv")
-            GLES20.glVertexAttribPointer(aPos, 3, GLES20.GL_FLOAT, false, 0, pos)
-            GLES20.glVertexAttribPointer(aUv, 2, GLES20.GL_FLOAT, false, 0, quadUv)
-            GLES20.glEnableVertexAttribArray(aPos)
-            GLES20.glEnableVertexAttribArray(aUv)
-            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
-            GLES20.glDisableVertexAttribArray(aPos)
-            GLES20.glDisableVertexAttribArray(aUv)
-            if (it.product.lens > 0f && lightMode != 2) drawGlow(it)
-            if (it === selected && !captureRequested) {
-                val pad = 0.006f
-                val box = floatArrayOf(-hw - pad, hh + pad, 0.001f, hw + pad, hh + pad, 0.001f, hw + pad, -hh - pad, 0.001f, -hw - pad, -hh - pad, 0.001f)
-                GLES20.glLineWidth(4f)
-                drawColor(it.model, box, 4, GLES20.GL_LINE_LOOP, 0.85f, 0.12f, 0.16f, 1f)
-            }
-        }
-    }
-
-    /** A lit lamp: a bright core on the lens and a soft halo on the surface around it, added on top. */
-    private fun drawGlow(it: Item) {
-        val lens = it.product.wMm / 1000f * it.product.lens
-        val col = if (lightMode == 1) floatArrayOf(0.93f, 0.96f, 1f) else floatArrayOf(1f, 0.85f, 0.62f)
-        GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE)
-        GLES20.glUseProgram(glowProg)
-        Matrix.multiplyMM(mvp, 0, vp, 0, it.model, 0)
-        GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(glowProg, "u_Mvp"), 1, false, mvp, 0)
-        val aPos = GLES20.glGetAttribLocation(glowProg, "a_Pos")
-        val aUv = GLES20.glGetAttribLocation(glowProg, "a_Uv")
-        fun pass(radius: Float, sharp: Float, gain: Float, c: FloatArray) {
-            val r = radius
-            val pos = quad(-r, r, 0.001f, r, r, 0.001f, -r, -r, 0.001f, r, -r, 0.001f)
-            quadUv.position(0)
-            GLES20.glUniform3f(GLES20.glGetUniformLocation(glowProg, "u_Color"), c[0], c[1], c[2])
-            GLES20.glUniform1f(GLES20.glGetUniformLocation(glowProg, "u_Sharp"), sharp)
-            GLES20.glUniform1f(GLES20.glGetUniformLocation(glowProg, "u_Gain"), gain)
-            GLES20.glVertexAttribPointer(aPos, 3, GLES20.GL_FLOAT, false, 0, pos)
-            GLES20.glVertexAttribPointer(aUv, 2, GLES20.GL_FLOAT, false, 0, quadUv)
-            GLES20.glEnableVertexAttribArray(aPos)
-            GLES20.glEnableVertexAttribArray(aUv)
-            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
-            GLES20.glDisableVertexAttribArray(aPos)
-            GLES20.glDisableVertexAttribArray(aUv)
-        }
-        pass(lens * 8f, 5f, 0.35f, col)                       // halo on the ceiling
-        pass(lens * 1.5f, 3.5f, 1.1f, floatArrayOf(1f, 0.97f, 0.9f)) // white-hot lens
-        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
-    }
-
-    // ---------- touch handling (runs on the GL thread) ----------
-    private fun project(m: FloatArray, x: Float, y: Float): FloatArray? {
-        val out = FloatArray(4)
-        Matrix.multiplyMM(mvp, 0, vp, 0, m, 0)
-        Matrix.multiplyMV(out, 0, mvp, 0, floatArrayOf(x, y, 0f, 1f), 0)
-        if (out[3] <= 0f) return null
-        return floatArrayOf((out[0] / out[3] + 1f) / 2f * viewW, (1f - out[1] / out[3]) / 2f * viewH)
-    }
-
-    private fun itemAt(x: Float, y: Float): Item? {
-        var best: Item? = null
-        var bestD = Float.MAX_VALUE
-        for (it in items) {
-            if (!it.visible) continue
-            val (hw, hh) = halfSize(it)
-            val c = project(it.model, 0f, 0f) ?: continue
-            val corners = listOf(project(it.model, -hw, hh), project(it.model, hw, hh), project(it.model, hw, -hh), project(it.model, -hw, -hh))
-            var reach = dp(36f)
-            if (corners.all { c2 -> c2 != null }) {
-                for (c2 in corners) reach = max(reach, hypot(c2!![0] - c[0], c2[1] - c[1]))
-            }
-            val d = hypot(x - c[0], y - c[1])
-            if (d <= reach && d < bestD) { bestD = d; best = it }
-        }
-        return best
+        val matrix = item.worldMatrix
+        matrix[0] = right[0]; matrix[1] = right[1]; matrix[2] = right[2]; matrix[3] = 0f
+        matrix[4] = up[0]; matrix[5] = up[1]; matrix[6] = up[2]; matrix[7] = 0f
+        matrix[8] = normal[0]; matrix[9] = normal[1]; matrix[10] = normal[2]; matrix[11] = 0f
+        matrix[12] = translation[0]; matrix[13] = translation[1]; matrix[14] = translation[2]; matrix[15] = 1f
     }
 
     private fun goodHit(frame: Frame, x: Float, y: Float): HitResult? {
         for (hit in frame.hitTest(x, y)) {
-            val tr = hit.trackable
-            val ok = when (tr) {
-                is Plane -> tr.isPoseInPolygon(hit.hitPose) && cameraInFront(hit, frame)
+            val acceptable = when (val trackable = hit.trackable) {
+                is Plane -> trackable.isPoseInPolygon(hit.hitPose) && cameraInFront(hit, frame)
                 is DepthPoint -> true
-                is Point -> tr.orientationMode == Point.OrientationMode.ESTIMATED_SURFACE_NORMAL
+                is Point -> trackable.orientationMode == Point.OrientationMode.ESTIMATED_SURFACE_NORMAL
                 else -> false
             }
-            if (ok) return hit
+            if (acceptable) return hit
         }
         return null
     }
 
     /** True when the phone is on the side of the surface its normal points to (in front of the wall, under the ceiling). */
     private fun cameraInFront(hit: HitResult, frame: Frame): Boolean {
-        val n = hit.hitPose.yAxis
-        val t = hit.hitPose.translation
-        val c = frame.camera.pose.translation
-        return (c[0] - t[0]) * n[0] + (c[1] - t[1]) * n[1] + (c[2] - t[2]) * n[2] > 0f
+        val normal = hit.hitPose.yAxis
+        val hitPoint = hit.hitPose.translation
+        val cameraPoint = frame.camera.pose.translation
+        return (cameraPoint[0] - hitPoint[0]) * normal[0] + (cameraPoint[1] - hitPoint[1]) * normal[1] + (cameraPoint[2] - hitPoint[2]) * normal[2] > 0f
     }
-
-    private var lastFrame: Frame? = null
-
-    private fun currentFrame(): Frame? = lastFrame
 
     private fun upFor(hit: HitResult, frame: Frame): FloatArray? {
-        val n = norm(hit.hitPose.yAxis)
-        if (abs(n[1]) < 0.7f) return null
+        val normal = normalize(hit.hitPose.yAxis)
+        if (abs(normal[1]) < 0.7f) return null
         // floors and ceilings: the picture's top points away from the person holding the phone
-        val z = frame.camera.pose.zAxis
-        val fwd = floatArrayOf(-z[0], 0f, -z[2])
-        val camUp = frame.camera.pose.yAxis
-        val pick = if (hypot(fwd[0], fwd[2]) > 0.2f) fwd else floatArrayOf(camUp[0], 0f, camUp[2])
-        return norm(pick)
+        val cameraBack = frame.camera.pose.zAxis
+        val forward = floatArrayOf(-cameraBack[0], 0f, -cameraBack[2])
+        val cameraUp = frame.camera.pose.yAxis
+        val pick = if (hypot(forward[0], forward[2]) > 0.2f) forward else floatArrayOf(cameraUp[0], 0f, cameraUp[2])
+        return normalize(pick)
     }
 
-    private fun onDown(x: Float, y: Float) {
-        dragging = itemAt(x, y)
-        val hit = dragging ?: return
-        selected = hit
-        val idx = products.indexOf(hit.product)
-        if (idx >= 0 && idx != current) runOnUiThread { current = idx; renderStrip() }
+    // ---------- models ----------
+    private fun modelKey(item: PlacedItem): String {
+        val lamp = if (item.product.lensFraction > 0f) lightState.name else "-"
+        return "${item.product.id}#${item.variant}#$lamp"
     }
 
-    private fun onMove(x: Float, y: Float) {
-        val it = dragging ?: return
-        val frame = currentFrame() ?: return
-        val hit = goodHit(frame, x, y) ?: return
-        val old = it.anchor
-        it.anchor = hit.createAnchor()
-        it.up = upFor(hit, frame)
-        old.detach()
-    }
-
-    private fun onUp(x: Float, y: Float, moved: Boolean) {
-        val wasDragging = dragging
-        dragging = null
-        if (moved || wasDragging != null) return
-        val frame = currentFrame() ?: return
-        val p = products.getOrNull(current) ?: return
-        val hit = goodHit(frame, x, y)
-        if (hit == null) {
-            uiToast("مفيش سطح متعرّف عليه هنا. حرّك الموبايل لحد ما تظهر الشبكة على الحيطة أو السقف.")
+    /** Builds (off the main thread) and shows the 3D model matching the item's colour and the light state. */
+    private fun requestModel(item: PlacedItem) {
+        val key = modelKey(item)
+        if (item.modelKey == key && item.modelNode != null) return
+        val cached = modelBytesCache[key]
+        if (cached != null) {
+            applyModel(item, key, cached)
             return
         }
-        val it = Item(p, variantOf[p.id] ?: 0, hit.createAnchor(), upFor(hit, frame))
-        items.add(it)
-        selected = it
+        if (!modelsBeingBuilt.add(key)) return
+        val product = item.product
+        val variant = product.variants[item.variant.coerceIn(0, product.variants.size - 1)]
+        val lamp = lightState
+        modelBuilder.execute {
+            val bytes = runCatching {
+                val photo = variant.bitmap ?: throw IllegalStateException("photo")
+                ProductModels.build(product.spec, photo, variant.label, lamp)
+            }.getOrNull()
+            mainHandler.post {
+                modelsBeingBuilt.remove(key)
+                if (activityGone) return@post
+                if (bytes == null) {
+                    uiToast("ما قدرتش أجهّز شكل ${product.name}.")
+                    return@post
+                }
+                modelBytesCache[key] = bytes
+                for (waiting in items) if (modelKey(waiting) == key) applyModel(waiting, key, bytes)
+            }
+        }
     }
 
-    private fun removeItem(it: Item) {
-        it.anchor.detach()
-        items.remove(it)
-        if (selected === it) selected = null
+    private fun applyModel(item: PlacedItem, key: String, bytes: ByteArray) {
+        if (item !in items || item.modelKey == key && item.modelNode != null) return
+        val buffer = ByteBuffer.allocateDirect(bytes.size).put(bytes)
+        buffer.flip()
+        val instance = runCatching { sceneView.modelLoader.createModelInstance(buffer) }.getOrNull() ?: return
+        val newNode = ModelNode(modelInstance = instance)
+        for (part in newNode.renderableNodes) {
+            part.isShadowCaster = part.name == "sides" || part.name == "face"
+            part.isShadowReceiver = false
+        }
+        item.modelNode?.let { oldNode -> discardModel(item.rootNode, oldNode) }
+        item.rootNode.addChildNode(newNode)
+        item.modelNode = newNode
+        item.modelKey = key
+
+        if (item.frameNode == null) {
+            val frameKey = "frame#${item.product.id}"
+            val frameBytes = modelBytesCache.getOrPut(frameKey) { ProductModels.buildSelectionFrame(item.product.spec) }
+            val frameBuffer = ByteBuffer.allocateDirect(frameBytes.size).put(frameBytes)
+            frameBuffer.flip()
+            runCatching { sceneView.modelLoader.createModelInstance(frameBuffer) }.getOrNull()?.let { frameInstance ->
+                val frameNode = ModelNode(modelInstance = frameInstance)
+                frameNode.isShadowCaster = false
+                frameNode.isShadowReceiver = false
+                item.rootNode.addChildNode(frameNode)
+                item.frameNode = frameNode
+            }
+        }
+    }
+
+    private fun discardModel(parent: Node, modelNode: ModelNode) {
+        parent.removeChildNode(modelNode)
+        runCatching { sceneView.modelLoader.destroyModel(modelNode.model) }
+    }
+
+    private fun placeItem(product: Product, hit: HitResult, frame: Frame) {
+        val anchor = runCatching { hit.createAnchor() }.getOrNull() ?: return
+        val rootNode = Node(engine = sceneView.engine)
+        val item = PlacedItem(product, variantOf[product.id] ?: 0, anchor, upFor(hit, frame), rootNode)
+        items.add(item)
+        sceneView.addChildNode(rootNode)
+        updateItemPlacement(item, cameraTracking = true)
+        selectItem(item)
+        requestModel(item)
+    }
+
+    private fun removeItem(item: PlacedItem) {
+        item.anchor?.detach()
+        item.anchor = null
+        item.modelNode?.let { modelNode -> discardModel(item.rootNode, modelNode) }
+        item.frameNode?.let { frameNode -> discardModel(item.rootNode, frameNode) }
+        item.modelNode = null
+        item.frameNode = null
+        sceneView.removeChildNode(item.rootNode)
+        runCatching { item.rootNode.destroy() }
+        items.remove(item)
+        if (selectedItem === item) selectedItem = null
+        if (draggedItem === item) draggedItem = null
+    }
+
+    private fun selectItem(item: PlacedItem?) {
+        selectedItem = item
+        for (other in items) other.frameNode?.isVisible = other === item && !capturing
+        if (item != null) {
+            val productIndex = products.indexOf(item.product)
+            if (productIndex >= 0 && productIndex != currentProduct) {
+                currentProduct = productIndex
+                renderStrip()
+            }
+        }
+    }
+
+    // ---------- touch ----------
+    private fun projectToScreen(item: PlacedItem, localX: Float, localY: Float): FloatArray? {
+        val world = FloatArray(4)
+        Matrix.multiplyMV(world, 0, item.worldMatrix, 0, floatArrayOf(localX, localY, 0f, 1f), 0)
+        val clip = FloatArray(4)
+        Matrix.multiplyMV(clip, 0, viewProjection, 0, world, 0)
+        if (clip[3] <= 0f) return null
+        return floatArrayOf((clip[0] / clip[3] + 1f) / 2f * sceneView.width, (1f - clip[1] / clip[3]) / 2f * sceneView.height)
+    }
+
+    private fun itemAt(x: Float, y: Float): PlacedItem? {
+        var best: PlacedItem? = null
+        var bestDistance = Float.MAX_VALUE
+        for (item in items) {
+            if (!item.onScreen) continue
+            val halfWidth = item.product.widthMm / 2000f
+            val halfHeight = item.product.heightMm / 2000f
+            val centre = projectToScreen(item, 0f, 0f) ?: continue
+            var reach = dp(36f)
+            for ((cornerX, cornerY) in listOf(-halfWidth to halfHeight, halfWidth to halfHeight, halfWidth to -halfHeight, -halfWidth to -halfHeight)) {
+                val corner = projectToScreen(item, cornerX, cornerY) ?: continue
+                reach = max(reach, hypot(corner[0] - centre[0], corner[1] - centre[1]))
+            }
+            val distance = hypot(x - centre[0], y - centre[1])
+            if (distance <= reach && distance < bestDistance) {
+                bestDistance = distance
+                best = item
+            }
+        }
+        return best
+    }
+
+    private fun handleTouch(event: MotionEvent) {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downX = event.x; downY = event.y; fingerMoved = false; twoFingerAngle = null
+                draggedItem = itemAt(event.x, event.y)
+                draggedItem?.let { item -> selectItem(item) }
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                if (event.pointerCount == 2 && selectedItem != null) {
+                    finishDrag(event.x, event.y)
+                    twoFingerAngle = fingerAngle(event)
+                }
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val startAngle = twoFingerAngle
+                val item = selectedItem
+                if (startAngle != null && event.pointerCount >= 2 && item != null) {
+                    // twist with two fingers to turn the product on the surface
+                    val angle = fingerAngle(event)
+                    var delta = angle - startAngle
+                    if (delta > 180f) delta -= 360f
+                    if (delta < -180f) delta += 360f
+                    item.rotationDegrees = (item.rotationDegrees - delta + 360f) % 360f
+                    twoFingerAngle = angle
+                    fingerMoved = true
+                    return
+                }
+                if (!fingerMoved && hypot(event.x - downX, event.y - downY) > touchSlopPx) fingerMoved = true
+                val dragged = draggedItem ?: return
+                if (!fingerMoved) return
+                val frame = lastFrame ?: return
+                val hit = goodHit(frame, event.x, event.y) ?: return
+                if (dragged.anchor != null) {
+                    dragged.anchor?.detach()
+                    dragged.anchor = null
+                }
+                dragged.dragPose = hit.hitPose
+                dragged.upHint = upFor(hit, frame)
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                if (event.pointerCount <= 2) twoFingerAngle = null
+            }
+            MotionEvent.ACTION_UP -> {
+                val wasDragging = draggedItem != null
+                finishDrag(event.x, event.y)
+                if (fingerMoved || wasDragging) return
+                val frame = lastFrame ?: return
+                val product = products.getOrNull(currentProduct) ?: return
+                val hit = goodHit(frame, event.x, event.y)
+                if (hit == null) {
+                    if (selectedItem != null) selectItem(null)
+                    else uiToast("مفيش سطح متعرّف عليه هنا. حرّك الموبايل لحد ما تظهر النقط على الحيطة أو السقف.")
+                    return
+                }
+                placeItem(product, hit, frame)
+            }
+            MotionEvent.ACTION_CANCEL -> finishDrag(event.x, event.y)
+        }
+    }
+
+    /** Pins a dragged item to the surface where the finger let go: one anchor per drag, not per movement. */
+    private fun finishDrag(x: Float, y: Float) {
+        val item = draggedItem ?: return
+        draggedItem = null
+        val lastPose = item.dragPose ?: return
+        val frame = lastFrame
+        val hit = frame?.let { goodHit(it, x, y) }
+        val anchor = runCatching { hit?.createAnchor() }.getOrNull()
+            ?: runCatching { sceneView.session?.createAnchor(lastPose) }.getOrNull()
+        if (hit != null && frame != null) item.upHint = upFor(hit, frame)
+        item.anchor = anchor
+        item.dragPose = if (anchor == null) lastPose else null
+        item.shownTranslation = null
+    }
+
+    private fun fingerAngle(event: MotionEvent): Float {
+        val deltaX = event.getX(1) - event.getX(0)
+        val deltaY = event.getY(1) - event.getY(0)
+        return Math.toDegrees(atan2(deltaY.toDouble(), deltaX.toDouble())).toFloat()
     }
 
     // ---------- status texts ----------
-    private fun setHint(t: String) = runOnUiThread {
-        hint.text = t
-        hint.visibility = if (t.isEmpty()) View.GONE else View.VISIBLE
+    private fun setHint(text: String) = runOnUiThread {
+        hintView.text = text
+        hintView.visibility = if (text.isEmpty()) View.GONE else View.VISIBLE
     }
 
-    private fun uiToast(t: String) = runOnUiThread { Toast.makeText(this, t, Toast.LENGTH_SHORT).show() }
+    private fun uiToast(text: String) = runOnUiThread { Toast.makeText(this, text, Toast.LENGTH_SHORT).show() }
 
-    private fun updateTexts(camera: Camera, planeCount: Int) {
+    private fun updateTexts(frame: Frame) {
         val now = System.currentTimeMillis()
-        if (now - lastUiMs < 250) return
-        lastUiMs = now
-        val h = when {
+        if (now - lastTextUpdateMs < 250) return
+        lastTextUpdateMs = now
+        val camera = frame.camera
+        val planeCount = sceneView.session?.getAllTrackables(Plane::class.java)?.count { plane ->
+            plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null
+        } ?: 0
+        val hint = when {
             camera.trackingState != TrackingState.TRACKING -> when (camera.trackingFailureReason) {
                 TrackingFailureReason.INSUFFICIENT_LIGHT -> "النور ضعيف. نوّر المكان أكتر."
                 TrackingFailureReason.EXCESSIVE_MOTION -> "حرّك الموبايل أبطأ."
@@ -893,66 +845,91 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
                 TrackingFailureReason.CAMERA_UNAVAILABLE -> "الكاميرا مش متاحة دلوقتي."
                 else -> "حرّك الموبايل ببطء يمين وشمال…"
             }
-            planeCount == 0 && items.isEmpty() -> "وجّه الكاميرا للحيطة أو السقف وحرّكها ببطء لحد ما تظهر شبكة نقط."
-            items.isEmpty() -> "دوس على الشبكة عشان تحط المنتج."
+            planeCount == 0 && items.isEmpty() -> "وجّه الكاميرا للحيطة أو السقف وحرّكها ببطء لحد ما تظهر نقط على السطح."
+            items.isEmpty() -> "دوس على السطح عشان تحط المنتج."
             else -> ""
         }
-        if (h != lastHint) { lastHint = h; setHint(h) }
+        if (hint != lastHint) { lastHint = hint; setHint(hint) }
 
-        val sel = selected
-        val text = if (sel == null) {
-            val p = products.getOrNull(current)
-            if (p == null) "" else "${p.name} · ${mmText(p)} — دوس على الحيطة أو السقف"
+        val selected = selectedItem
+        val text = if (selected == null) {
+            val product = products.getOrNull(currentProduct)
+            if (product == null) "" else "${product.name} · ${mmText(product)} — دوس على الحيطة أو السقف"
         } else {
-            val t = sel.anchor.pose.translation
-            var near = Float.MAX_VALUE
-            for (o in items) {
-                if (o === sel) continue
-                val q = o.anchor.pose.translation
-                near = minOf(near, sqrt((t[0] - q[0]) * (t[0] - q[0]) + (t[1] - q[1]) * (t[1] - q[1]) + (t[2] - q[2]) * (t[2] - q[2])))
+            val position = translationOf(selected)
+            var nearest = Float.MAX_VALUE
+            for (other in items) {
+                if (other === selected) continue
+                nearest = minOf(nearest, distance(position, translationOf(other)))
             }
-            val c = camera.pose.translation
-            val far = sqrt((t[0] - c[0]) * (t[0] - c[0]) + (t[1] - c[1]) * (t[1] - c[1]) + (t[2] - c[2]) * (t[2] - c[2]))
-            val label = sel.product.variants.getOrNull(sel.variant)?.label.orEmpty()
+            val away = distance(position, camera.pose.translation)
+            val label = selected.product.variants.getOrNull(selected.variant)?.label.orEmpty()
             buildString {
-                append(sel.product.name)
-                if (label.isNotBlank() && sel.product.variants.size > 1) append(" · ").append(label)
-                append(" · ").append(mmText(sel.product))
-                if (near < Float.MAX_VALUE) append("\nلأقرب قطعة: ").append(lenText(near))
-                append("   بعدك عنه: ").append(lenText(far))
+                append(selected.product.name)
+                if (label.isNotBlank() && selected.product.variants.size > 1) append(" · ").append(label)
+                append(" · ").append(mmText(selected.product))
+                if (nearest < Float.MAX_VALUE) append("\nلأقرب قطعة: ").append(lengthText(nearest))
+                append("   بعدك عنه: ").append(lengthText(away))
                 append("   على الصورة: ").append(items.size)
             }
         }
-        if (text != lastInfo) { lastInfo = text; runOnUiThread { info.text = text } }
+        if (text != lastInfo) { lastInfo = text; infoView.text = text }
     }
 
-    private fun lenText(m: Float): String = if (m >= 1f) String.format(java.util.Locale.US, "%.2f م", m) else "${(m * 100f).roundToInt()} سم"
+    private fun translationOf(item: PlacedItem): FloatArray =
+        floatArrayOf(item.worldMatrix[12], item.worldMatrix[13], item.worldMatrix[14])
+
+    private fun distance(first: FloatArray, second: FloatArray): Float {
+        val deltaX = first[0] - second[0]
+        val deltaY = first[1] - second[1]
+        val deltaZ = first[2] - second[2]
+        return sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ)
+    }
+
+    private fun lengthText(metres: Float): String =
+        if (metres >= 1f) String.format(Locale.US, "%.2f م", metres) else "${(metres * 100f).roundToInt()} سم"
 
     // ---------- capture ----------
+    /** Hides the selection outline and the surface dots, waits for a clean frame, then copies the screen. */
     private fun capture() {
-        val w = viewW
-        val h = viewH
-        val buf = ByteBuffer.allocateDirect(w * h * 4).order(ByteOrder.nativeOrder())
-        GLES20.glReadPixels(0, 0, w, h, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf)
+        if (capturing) return
+        if (sceneView.width <= 0 || sceneView.height <= 0) return
+        capturing = true
+        for (item in items) item.frameNode?.isVisible = false
+        sceneView.planeRenderer.isVisible = false
         val counts = LinkedHashMap<String, Int>()
-        for (it in items) {
-            val label = it.product.variants.getOrNull(it.variant)?.label.orEmpty()
-            val key = it.product.name + (if (label.isNotBlank() && it.product.variants.size > 1) "، $label" else "") + "، " + mmText(it.product)
+        for (item in items) {
+            val label = item.product.variants.getOrNull(item.variant)?.label.orEmpty()
+            val key = item.product.name + (if (label.isNotBlank() && item.product.variants.size > 1) "، $label" else "") + "، " + mmText(item.product)
             counts[key] = (counts[key] ?: 0) + 1
         }
+        mainHandler.postDelayed({
+            val shot = Bitmap.createBitmap(sceneView.width, sceneView.height, Bitmap.Config.ARGB_8888)
+            try {
+                PixelCopy.request(sceneView, shot, { copyResult ->
+                    capturing = false
+                    selectItem(selectedItem)
+                    if (copyResult != PixelCopy.SUCCESS) {
+                        uiToast("الصورة ما اتحفظتش.")
+                        return@request
+                    }
+                    saveShot(shot, counts)
+                }, mainHandler)
+            } catch (e: Exception) {
+                capturing = false
+                selectItem(selectedItem)
+                uiToast("الصورة ما اتحفظتش: ${e.message}")
+            }
+        }, 150)
+    }
+
+    private fun saveShot(shot: Bitmap, counts: Map<String, Int>) {
         Thread {
             try {
-                buf.position(0)
-                val raw = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                raw.copyPixelsFromBuffer(buf)
-                raw.setHasAlpha(false)
-                val flip = GMatrix().apply { preScale(1f, -1f) }
-                val shot = Bitmap.createBitmap(raw, 0, 0, w, h, flip, false)
-                raw.recycle()
-                val out = withList(shot, counts)
-                val bos = ByteArrayOutputStream()
-                out.compress(Bitmap.CompressFormat.JPEG, 92, bos)
-                val where = MainActivity.saveJpeg(this, bos.toByteArray(), "panda_live_${System.currentTimeMillis()}.jpg")
+                val finalPicture = withList(shot, counts)
+                val stream = ByteArrayOutputStream()
+                finalPicture.compress(Bitmap.CompressFormat.JPEG, 92, stream)
+                val where = MainActivity.saveJpeg(this, stream.toByteArray(), "panda_live_${System.currentTimeMillis()}.jpg")
                 uiToast("الصورة اتحفظت في $where")
             } catch (e: Exception) {
                 uiToast("الصورة ما اتحفظتش: ${e.message}")
@@ -962,30 +939,28 @@ class ArActivity : AppCompatActivity(), GLSurfaceView.Renderer {
 
     private fun withList(shot: Bitmap, counts: Map<String, Int>): Bitmap {
         if (counts.isEmpty()) return shot
-        val w = shot.width
-        val fs = max(28f, w * 0.032f)
-        val lh = fs * 1.6f
-        val pad = w * 0.04f
-        val band = (pad * 2 + fs * 1.5f + counts.size * lh).toInt()
-        val out = Bitmap.createBitmap(w, shot.height + band, Bitmap.Config.ARGB_8888)
-        val c = Canvas(out)
-        c.drawBitmap(shot, 0f, 0f, null)
-        c.drawColor(Color.WHITE, android.graphics.PorterDuff.Mode.DST_OVER)
-        val bg = Paint().apply { color = Color.WHITE }
-        c.drawRect(0f, shot.height.toFloat(), w.toFloat(), out.height.toFloat(), bg)
-        val title = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFF15181D.toInt(); textSize = fs * 1.1f; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.RIGHT
+        val width = shot.width
+        val fontSize = max(28f, width * 0.032f)
+        val lineHeight = fontSize * 1.6f
+        val padding = width * 0.04f
+        val bandHeight = (padding * 2 + fontSize * 1.5f + counts.size * lineHeight).toInt()
+        val picture = Bitmap.createBitmap(width, shot.height + bandHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(picture)
+        canvas.drawBitmap(shot, 0f, 0f, null)
+        canvas.drawColor(Color.WHITE, PorterDuff.Mode.DST_OVER)
+        canvas.drawRect(0f, shot.height.toFloat(), width.toFloat(), picture.height.toFloat(), Paint().apply { color = Color.WHITE })
+        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFF15181D.toInt(); textSize = fontSize * 1.1f; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.RIGHT
         }
-        val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF15181D.toInt(); textSize = fs; textAlign = Paint.Align.RIGHT }
-        var y = shot.height + pad + fs
-        c.drawText("المنتجات على الصورة", w - pad, y, title)
-        y += fs * 0.4f
-        for ((k, n) in counts) {
-            y += lh
-            c.drawText("$n × $k", w - pad, y, line)
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF15181D.toInt(); textSize = fontSize; textAlign = Paint.Align.RIGHT }
+        var baseline = shot.height + padding + fontSize
+        canvas.drawText("المنتجات على الصورة", width - padding, baseline, titlePaint)
+        baseline += fontSize * 0.4f
+        for ((name, count) in counts) {
+            baseline += lineHeight
+            canvas.drawText("$count × $name", width - padding, baseline, linePaint)
         }
         shot.recycle()
-        return out
+        return picture
     }
-
 }

@@ -50,5 +50,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.webkit:webkit:1.12.1")
-    implementation("com.google.ar:core:1.45.0")
+    implementation("com.google.ar:core:1.48.0")
+    // Filament-based 3D engine for the live camera: PBR materials, shadows, Environmental HDR light
+    implementation("io.github.sceneview:arsceneview:2.3.0")
 }

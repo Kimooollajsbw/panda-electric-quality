@@ -1399,7 +1399,8 @@ function pot(n){let p=32;while(p<n&&p<1024) p*=2;return p;}
 async function productPng(p,ci){
   const L=512,cw=p.w>=p.h?L:pot(L*p.w/p.h),ch=p.h>p.w?L:pot(L*p.h/p.w);
   const defs=overlay.querySelector('defs').outerHTML;
-  const art=artFor(p,ci).replace(/<circle r="[^"]*" fill="url\(#gGlow\)"\/>/g,'');
+  // the live camera draws its own glow and a real 3D shadow, so leave both out of the picture
+  const art=artFor(p,ci).replace(/<circle r="[^"]*" fill="url\(#gGlow\)"\/>/g,'').replace(/ filter="url\(#fShadow\)"/g,'');
   const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+(-p.w/2)+' '+(-p.h/2)+' '+p.w+' '+p.h+'" width="'+cw+'" height="'+ch+'" preserveAspectRatio="none">'+defs+art+'</svg>';
   const im=await loadImg('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg));
   const c=document.createElement('canvas');c.width=cw;c.height=ch;c.getContext('2d').drawImage(im,0,0,cw,ch);
@@ -1419,7 +1420,7 @@ async function startLive(){
       const vs=[];
       if(p.colors&&!p.img){for(let i=0;i<p.colors.length;i++) vs.push({label:p.colors[i].ar,png:await productPng(p,i)});}
       else vs.push({label:'',png:await productPng(p,0)});
-      out.push({id:p.id,name:p.name,w:p.w,h:p.h,variant:state.lastColor[p.id]||0,light:p.light||0,variants:vs});
+      out.push({id:p.id,name:p.name,w:p.w,h:p.h,cat:p.cat,shape:p.shape,variant:state.lastColor[p.id]||0,light:p.light||0,variants:vs});
     }
     const it=selItem(),start=it?it.pid:(list.find(p=>p.cat===state.cat)||list[0]).id;
     APP.startAr(JSON.stringify({products:out,start:start,light:state.lastLight}));

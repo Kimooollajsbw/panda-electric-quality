@@ -9,8 +9,9 @@ Owner: Hakim (engineer at Panda, Port Said). Talk to him in Egyptian Arabic.
 - `app/src/main/assets/www/products/` — real product photos (straight-on cutouts, WebP) + `logo.png`.
 - `app/src/main/assets/www/fonts/` — Changa + IBM Plex Sans Arabic (offline, OFL).
 - `app/src/main/java/com/panda/realsize/MainActivity.kt` — WebView host + JS bridge `window.AndroidApp`: `isApp`, `arStatus`, `startAr(json)`, `saveImage(b64,name)`, `copy`, `share`. Back button calls `window.__androidBack()`.
-- `ArActivity.kt` — live camera mode: ARCore (horizontal + vertical planes), OpenGL ES 2 renderer. Products are textured quads of real size (mm/1000 m), lamp glow pass, ARCore ambient light estimate. Products arrive from the page as `cacheDir/ar_products.json` (pre-rendered WebP per colour).
-- `GlUtil.kt` — shader/texture helpers.
+- `ArActivity.kt` — live camera mode on SceneView 2.3.0 (`ARSceneView`, Filament PBR engine) + ARCore 1.48: horizontal + vertical planes, Environmental HDR light estimate (main light direction, ambient SH, reflection cubemap), shadows on detected planes, MSAA, bloom, optional depth occlusion ("الحجب" chip, off by default). Each item is a plain `Node` placed every frame from its ARCore anchor (x right, y up along the surface, z = surface normal); while dragging it follows the hit pose smoothly and gets one new anchor on release. Products arrive from the page as `cacheDir/ar_products.json` (`id,name,w,h,cat,shape,light,variant,variants[{label,png}]`, pre-rendered WebP per colour).
+- `ProductModels.kt` — builds each product's 3D model (GLB) at run time from its photo: contact shadow, sides (stacked alpha-masked slices of the photo = exact silhouette, depth per category in `depthMm`), face with a metal/roughness map guessed from the photo colours, lit lens + glare when the light is on. Also the red selection outline.
+- `GlbWriter.kt` — minimal in-memory glTF 2.0 binary writer (meshes, materials, PNG textures).
 - `tools/fetch_photos.py` + `.github/workflows/photos.yml` — download product photos from panda-electric.com and remove background (rembg). Runs on GitHub (the site is reachable there).
 - `tools/process_photos.py` — turn raw photos into front-view cutouts, add an MR16 lamp in spot holes.
 - `.github/workflows/build-apk.yml` — every push to `android-app` builds the APK and publishes a GitHub Release `apk-<run>`.
@@ -30,5 +31,6 @@ Owner: Hakim (engineer at Panda, Port Said). Talk to him in Egyptian Arabic.
 ## Open items
 - Real product dimensions (all marked تقريبي).
 - Front-view photos for missing colours (round spot silver×silver, white×silver, black×silver; track products are side views).
-- Live camera mode not yet tested on a real phone.
+- Live camera mode not yet tested on a real phone (3D engine version: tune shadow strength, glow, emissive and bloom on a device).
+- Product depths in `ProductModels.depthMm` are guesses per category, like the sizes.
 - Repo is public (contains logo, photos, debug key); early commits carry a personal email — owner to decide on making it private / rewriting history.
