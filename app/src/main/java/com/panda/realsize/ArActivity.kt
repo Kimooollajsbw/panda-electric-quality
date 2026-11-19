@@ -92,7 +92,8 @@ class ArActivity : AppCompatActivity() {
         val category: String,
         val round: Boolean,
         val lensFraction: Float,
-        val variants: List<Variant>
+        val variants: List<Variant>,
+        val modelAsset: String            // ready-made GLB in assets/www/models (real CAD model), or blank
     ) {
         val spec = ProductModels.Spec(widthMm, heightMm, category, round, lensFraction)
     }
@@ -107,6 +108,7 @@ class ArActivity : AppCompatActivity() {
         var modelNode: ModelNode? = null,
         var modelKey: String = "",
         var frameNode: ModelNode? = null,
+        var shadowNode: ModelNode? = null,
         var dragPose: Pose? = null,
         var shownTranslation: FloatArray? = null,
         val worldMatrix: FloatArray = FloatArray(16),
@@ -203,7 +205,8 @@ class ArActivity : AppCompatActivity() {
                         category = entry.optString("cat", "mine"),
                         round = entry.optString("shape") == "round",
                         lensFraction = entry.optDouble("light", 0.0).toFloat(),
-                        variants = variants
+                        variants = variants,
+                        modelAsset = entry.optString("model")
                     )
                 )
                 variantOf[id] = entry.optInt("variant", 0).coerceIn(0, variants.size - 1)
@@ -599,6 +602,7 @@ class ArActivity : AppCompatActivity() {
 
     // ---------- models ----------
     private fun modelKey(item: PlacedItem): String {
+        if (item.product.modelAsset.isNotBlank()) return "asset#${item.product.modelAsset}"
         val lamp = if (item.product.lensFraction > 0f) lightState.name else "-"
         return "${item.product.id}#${item.variant}#$lamp"
     }
@@ -617,9 +621,16 @@ class ArActivity : AppCompatActivity() {
         val variant = product.variants[item.variant.coerceIn(0, product.variants.size - 1)]
         val lamp = lightState
         modelBuilder.execute {
+            var shadowBytes: ByteArray? = null
             val bytes = runCatching {
                 val photo = variant.bitmap ?: throw IllegalStateException("photo")
-                ProductModels.build(product.spec, photo, variant.label, lamp)
+                if (product.modelAsset.isNotBlank()) {
+                    // real CAD model shipped with the app; only its soft shadow is made here
+                    shadowBytes = runCatching { ProductModels.buildContactShadow(product.spec, photo, blurMm = 9f, opacity = 0.55f) }.getOrNull()
+                    assets.open("www/models/${product.modelAsset}").use { stream -> stream.readBytes() }
+                } else {
+                    ProductModels.build(product.spec, photo, variant.label, lamp)
+                }
             }.getOrNull()
             mainHandler.post {
                 modelsBeingBuilt.remove(key)
@@ -628,6 +639,7 @@ class ArActivity : AppCompatActivity() {
                     uiToast("ما قدرتش أجهّز شكل ${product.name}.")
                     return@post
                 }
+                shadowBytes?.let { modelBytesCache["$key#shadow"] = it }
                 modelBytesCache[key] = bytes
                 for (waiting in items) if (modelKey(waiting) == key) applyModel(waiting, key, bytes)
             }
@@ -640,14 +652,38 @@ class ArActivity : AppCompatActivity() {
         buffer.flip()
         val instance = runCatching { sceneView.modelLoader.createModelInstance(buffer) }.getOrNull() ?: return
         val newNode = ModelNode(modelInstance = instance)
+        val realModel = item.product.modelAsset.isNotBlank()
         for (part in newNode.renderableNodes) {
-            part.isShadowCaster = part.name == "sides" || part.name == "face"
+            part.isShadowCaster = realModel || part.name == "sides" || part.name == "face"
             part.isShadowReceiver = false
+        }
+        if (realModel) {
+            // glTF is Y-up; the item frame has z = surface normal and y = up along the surface
+            newNode.transform = Mat4(
+                Float4(1f, 0f, 0f, 0f),
+                Float4(0f, 0f, 1f, 0f),
+                Float4(0f, -1f, 0f, 0f),
+                Float4(0f, 0f, 0f, 1f)
+            )
         }
         item.modelNode?.let { oldNode -> discardModel(item.rootNode, oldNode) }
         item.rootNode.addChildNode(newNode)
         item.modelNode = newNode
         item.modelKey = key
+
+        if (realModel && item.shadowNode == null) {
+            modelBytesCache["$key#shadow"]?.let { shadowBytes ->
+                val shadowBuffer = ByteBuffer.allocateDirect(shadowBytes.size).put(shadowBytes)
+                shadowBuffer.flip()
+                runCatching { sceneView.modelLoader.createModelInstance(shadowBuffer) }.getOrNull()?.let { shadowInstance ->
+                    val shadowNode = ModelNode(modelInstance = shadowInstance)
+                    shadowNode.isShadowCaster = false
+                    shadowNode.isShadowReceiver = false
+                    item.rootNode.addChildNode(shadowNode)
+                    item.shadowNode = shadowNode
+                }
+            }
+        }
 
         if (item.frameNode == null) {
             val frameKey = "frame#${item.product.id}"
@@ -685,8 +721,10 @@ class ArActivity : AppCompatActivity() {
         item.anchor = null
         item.modelNode?.let { modelNode -> discardModel(item.rootNode, modelNode) }
         item.frameNode?.let { frameNode -> discardModel(item.rootNode, frameNode) }
+        item.shadowNode?.let { shadowNode -> discardModel(item.rootNode, shadowNode) }
         item.modelNode = null
         item.frameNode = null
+        item.shadowNode = null
         sceneView.removeChildNode(item.rootNode)
         runCatching { item.rootNode.destroy() }
         items.remove(item)

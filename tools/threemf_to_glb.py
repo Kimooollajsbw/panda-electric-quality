@@ -6,7 +6,11 @@ but no colours, so each part gets a material by matching its name against MATERI
 
 Output is standard glTF: metres, Y up, the product centred on X/Z and standing on Y = 0.
 
+With --top-view it also draws a straight-down picture of the product (PNG with transparent
+background, exactly the model's footprint) for the photo-mode editor and the product strip.
+
 Usage: python tools/threemf_to_glb.py input.3mf output.glb [--skip NAME_PART ...]
+                                       [--top-view top.png --pixels-per-mm 2]
 Standard library only.
 """
 
@@ -16,6 +20,7 @@ import math
 import struct
 import sys
 import zipfile
+import zlib
 import xml.etree.ElementTree as ElementTree
 
 CORE_NAMESPACE = "{http://schemas.microsoft.com/3dmanufacturing/core/2015/02}"
@@ -236,11 +241,133 @@ def write_glb(path, primitives_by_material, materials):
         output.write(binary)
 
 
+def linear_to_srgb(channel):
+    channel = max(0.0, min(1.0, channel))
+    return 12.92 * channel if channel <= 0.0031308 else 1.055 * channel ** (1 / 2.4) - 0.055
+
+
+def write_png(path, width, height, rgba_rows):
+    def chunk(kind, payload):
+        return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", zlib.crc32(kind + payload) & 0xFFFFFFFF)
+    raw = b"".join(b"\x00" + bytes(row) for row in rgba_rows)
+    with open(path, "wb") as output:
+        output.write(b"\x89PNG\r\n\x1a\n")
+        output.write(chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)))
+        output.write(chunk(b"IDAT", zlib.compress(raw, 9)))
+        output.write(chunk(b"IEND", b""))
+
+
+def write_top_view(path, primitives_by_material, materials, pixels_per_mm, supersample=3):
+    """Orthographic view from straight above (glTF -Y), picture top = -Z, transparent background."""
+    all_positions = [point for positions, _, _ in primitives_by_material.values() for point in positions]
+    minimum_x = min(point[0] for point in all_positions)
+    maximum_x = max(point[0] for point in all_positions)
+    minimum_z = min(point[2] for point in all_positions)
+    maximum_z = max(point[2] for point in all_positions)
+    pixels_per_metre = pixels_per_mm * 1000.0 * supersample
+    width = max(1, round((maximum_x - minimum_x) * pixels_per_metre))
+    height = max(1, round((maximum_z - minimum_z) * pixels_per_metre))
+    depth = [[-1e9] * width for _ in range(height)]
+    colour = [[None] * width for _ in range(height)]
+    light_direction = normalize((-0.35, 1.0, -0.45))
+
+    for material_name, (positions, normals, indices) in primitives_by_material.items():
+        base_color, metallic, roughness, emissive = materials[material_name]
+        for triangle_start in range(0, len(indices), 3):
+            corners = [indices[triangle_start + offset] for offset in range(3)]
+            screen = [((positions[c][0] - minimum_x) * pixels_per_metre, (positions[c][2] - minimum_z) * pixels_per_metre, positions[c][1]) for c in corners]
+            (x0, y0, d0), (x1, y1, d1), (x2, y2, d2) = screen
+            area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0)
+            if abs(area) < 1e-9:
+                continue
+            column_start = max(0, int(math.floor(min(x0, x1, x2))))
+            column_end = min(width - 1, int(math.ceil(max(x0, x1, x2))))
+            row_start = max(0, int(math.floor(min(y0, y1, y2))))
+            row_end = min(height - 1, int(math.ceil(max(y0, y1, y2))))
+            face_normal = normalize([sum(normals[c][axis] for c in corners) for axis in range(3)])
+            if face_normal[1] < -0.2:
+                continue
+            diffuse = max(0.0, sum(face_normal[axis] * light_direction[axis] for axis in range(3)))
+            shade = 0.38 + 0.62 * diffuse
+            if metallic > 0.5:
+                shade = 0.3 + 0.9 * diffuse ** 2
+            pixel_colour = [base_color[axis] * shade + (emissive[axis] if emissive else 0.0) for axis in range(3)]
+            for row in range(row_start, row_end + 1):
+                pixel_y = row + 0.5
+                for column in range(column_start, column_end + 1):
+                    pixel_x = column + 0.5
+                    weight_0 = ((x1 - pixel_x) * (y2 - pixel_y) - (x2 - pixel_x) * (y1 - pixel_y)) / area
+                    weight_1 = ((x2 - pixel_x) * (y0 - pixel_y) - (x0 - pixel_x) * (y2 - pixel_y)) / area
+                    weight_2 = 1.0 - weight_0 - weight_1
+                    if weight_0 < 0 or weight_1 < 0 or weight_2 < 0:
+                        continue
+                    height_here = weight_0 * d0 + weight_1 * d1 + weight_2 * d2
+                    if height_here > depth[row][column]:
+                        depth[row][column] = height_here
+                        colour[row][column] = pixel_colour
+
+    output_width = width // supersample
+    output_height = height // supersample
+    averaged_colour = [[None] * output_width for _ in range(output_height)]
+    averaged_height = [[None] * output_width for _ in range(output_height)]
+    coverage = [[0.0] * output_width for _ in range(output_height)]
+    for output_row in range(output_height):
+        for output_column in range(output_width):
+            totals = [0.0, 0.0, 0.0]
+            height_total = 0.0
+            covered = 0
+            for sub_row in range(supersample):
+                for sub_column in range(supersample):
+                    sample_row = output_row * supersample + sub_row
+                    sample_column = output_column * supersample + sub_column
+                    sample = colour[sample_row][sample_column]
+                    if sample is not None:
+                        covered += 1
+                        height_total += depth[sample_row][sample_column]
+                        for axis in range(3):
+                            totals[axis] += sample[axis]
+            if covered:
+                averaged_colour[output_row][output_column] = [total / covered for total in totals]
+                averaged_height[output_row][output_column] = height_total / covered
+                coverage[output_row][output_column] = covered / (supersample * supersample)
+
+    # recesses (socket holes, cavities) read darker than the surface around them
+    radius = max(1, round(6 * pixels_per_mm))
+    horizontal_max = [[None] * output_width for _ in range(output_height)]
+    for output_row in range(output_height):
+        heights = averaged_height[output_row]
+        for output_column in range(output_width):
+            window = [value for value in heights[max(0, output_column - radius):output_column + radius + 1] if value is not None]
+            horizontal_max[output_row][output_column] = max(window) if window else None
+    rows = []
+    for output_row in range(output_height):
+        row_bytes = []
+        for output_column in range(output_width):
+            pixel_colour = averaged_colour[output_row][output_column]
+            if pixel_colour is None:
+                row_bytes.extend((0, 0, 0, 0))
+                continue
+            window = [
+                horizontal_max[neighbour_row][output_column]
+                for neighbour_row in range(max(0, output_row - radius), min(output_height, output_row + radius + 1))
+                if horizontal_max[neighbour_row][output_column] is not None
+            ]
+            recess_depth = max(window) - averaged_height[output_row][output_column]
+            darkening = 1.0 - 0.65 * min(1.0, max(0.0, recess_depth) / 0.012)
+            row_bytes.extend(round(linear_to_srgb(pixel_colour[axis] * darkening) * 255) for axis in range(3))
+            row_bytes.append(round(255 * coverage[output_row][output_column]))
+        rows.append(row_bytes)
+    write_png(path, output_width, output_height, rows)
+    print("top view: %d x %d px" % (output_width, output_height))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input_3mf")
     parser.add_argument("output_glb")
     parser.add_argument("--skip", nargs="*", default=[], help="part names to leave out (e.g. a loose spare part)")
+    parser.add_argument("--top-view", help="also write a straight-down PNG of the product here")
+    parser.add_argument("--pixels-per-mm", type=float, default=2.0)
     arguments = parser.parse_args()
 
     unit, meshes, components, names, build_items = read_model(arguments.input_3mf)
@@ -281,6 +408,8 @@ def main():
         bucket[2].extend(index + offset for index in indices)
 
     write_glb(arguments.output_glb, primitives_by_material, materials)
+    if arguments.top_view:
+        write_top_view(arguments.top_view, primitives_by_material, materials, arguments.pixels_per_mm)
     size_x = (max(p[0] for p in all_points) - min(p[0] for p in all_points))
     size_y = (max(p[1] for p in all_points) - min(p[1] for p in all_points))
     size_z = (max(p[2] for p in all_points) - min(p[2] for p in all_points))

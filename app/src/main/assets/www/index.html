@@ -506,7 +506,7 @@ function artFor(p,ci){
    Names, categories and colours of the Panda items come from panda-electric.com.
    That site lists no dimensions, so every size here is a typical one, flagged approximate
    until someone measures the product and saves the real size. */
-const CATS=[{id:'spot',name:'سبوت'},{id:'panel',name:'بانل'},{id:'track',name:'ماجنتك تراك'},{id:'holder',name:'دواية ديكور'},{id:'wallbox',name:'أجراس وعلب'},{id:'mine',name:'منتجاتي'}];
+const CATS=[{id:'spot',name:'سبوت'},{id:'panel',name:'بانل'},{id:'track',name:'ماجنتك تراك'},{id:'holder',name:'دواية ديكور'},{id:'wallbox',name:'أجراس وعلب'},{id:'power',name:'مشتركات'},{id:'mine',name:'منتجاتي'}];
 const BASE_LIST=[
   {id:'sp-round',light:.25,cat:'spot',name:'سبوت مدور',en:'MR16 / GU5.3 Swivel Frame, Round Model',w:90,h:90,shape:'round',colors:ROUND_REAL,draw:(p,c)=>A.spotFrame('round',p.w,c.c)},
   {id:'sp-square',light:.25,cat:'spot',name:'سبوت مربع',en:'MR16 / GU5.3 Swivel Frame, Square Model',w:90,h:90,shape:'rect',colors:SQUARE_REAL,draw:(p,c)=>A.spotFrame('square',Math.min(p.w,p.h),c.c)},
@@ -523,10 +523,12 @@ const BASE_LIST=[
   {id:'mb-box',cat:'wallbox',name:'علبة ماجيك',en:'Magic Box',w:105,h:103,photo:'mb-box',shape:'rect',draw:p=>A.box(p.w,p.h)},
   {id:'mb-pro',cat:'wallbox',name:'ماجيك برو',en:'Magic Pro',w:105,h:113,photo:'mb-pro',shape:'rect',draw:p=>A.box(p.w,p.h)},
   {id:'db-bird',cat:'wallbox',name:'جرس عصفور',en:'Bird Sound Bell',w:130,h:95,photo:'db-bird',shape:'rect',draw:p=>A.bell(p.w,p.h)},
-  {id:'db-ding',cat:'wallbox',name:'جرس دينج دونج',en:'Ding Dong Bell',w:160,h:112,photo:'db-ding',shape:'rect',draw:p=>A.bell(p.w,p.h)}
+  {id:'db-ding',cat:'wallbox',name:'جرس دينج دونج',en:'Ding Dong Bell',w:160,h:112,photo:'db-ding',shape:'rect',draw:p=>A.bell(p.w,p.h)},
+  /* real 3D model from the SolidWorks assembly (tools/threemf_to_glb.py): exact size, footprint includes the cord */
+  {id:'mps-strip',cat:'power',name:'مشترك موديولار',en:'Modular Power Strip',w:445,h:76,photo:'mps-strip',photoExt:'.png',model:'mps-strip.glb',exact:true,shape:'rect'}
 ];
-const BASE={};for(const b of BASE_LIST){b.approx=true;BASE[b.id]=b;
-  if(b.photo) PHOTO_FILES.push(b.photo+'.webp');
+const BASE={};for(const b of BASE_LIST){b.approx=!b.exact;BASE[b.id]=b;
+  if(b.photo) PHOTO_FILES.push(b.photo+(b.photoExt||'.webp'));
   if(b.colors) for(const c of b.colors) if(c.file) PHOTO_FILES.push(c.file+'.webp');}
 
 /* ---------- elements ---------- */
@@ -1407,7 +1409,7 @@ async function productPng(p,ci){
   let d=c.toDataURL('image/webp',.9);if(d.indexOf('data:image/webp')!==0) d=c.toDataURL('image/png');
   return d.split(',')[1];
 }
-const SURF_ORDER={ceiling:['spot','panel','track','holder','wallbox','mine'],wall:['wallbox','spot','track','holder','panel','mine']};
+const SURF_ORDER={ceiling:['spot','panel','track','holder','wallbox','power','mine'],wall:['wallbox','spot','track','holder','panel','power','mine']};
 async function startLive(){
   const btn=$('#btnLive');if(btn.disabled) return;
   btn.disabled=true;toast('بجهّز المنتجات للكاميرا…');
@@ -1420,7 +1422,7 @@ async function startLive(){
       const vs=[];
       if(p.colors&&!p.img){for(let i=0;i<p.colors.length;i++) vs.push({label:p.colors[i].ar,png:await productPng(p,i)});}
       else vs.push({label:'',png:await productPng(p,0)});
-      out.push({id:p.id,name:p.name,w:p.w,h:p.h,cat:p.cat,shape:p.shape,variant:state.lastColor[p.id]||0,light:p.light||0,variants:vs});
+      out.push({id:p.id,name:p.name,w:p.w,h:p.h,cat:p.cat,shape:p.shape,model:p.model||'',variant:state.lastColor[p.id]||0,light:p.light||0,variants:vs});
     }
     const it=selItem(),start=it?it.pid:(list.find(p=>p.cat===state.cat)||list[0]).id;
     APP.startAr(JSON.stringify({products:out,start:start,light:state.lastLight}));

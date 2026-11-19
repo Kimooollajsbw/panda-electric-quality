@@ -53,7 +53,85 @@ object ProductModels {
         "track" -> 40f
         "holder" -> 25f
         "wallbox" -> 30f
+        "power" -> 0f   // real CAD model: its own geometry, the outline sits on the surface
         else -> 4f
+    }
+
+    /**
+     * Soft shadow on the surface under a product that has a real 3D model: its top-view outline
+     * (the photo's transparency) blurred by [blurMm] and spread a little beyond the footprint.
+     */
+    fun buildContactShadow(spec: Spec, topView: Bitmap, blurMm: Float, opacity: Float): ByteArray {
+        val writer = GlbWriter()
+        writer.useExtension("KHR_materials_unlit")
+        val spreadMm = blurMm * 1.5f
+        val totalWidthMm = spec.widthMm + spreadMm * 2f
+        val totalHeightMm = spec.heightMm + spreadMm * 2f
+        val pixelsPerMm = 256f / max(totalWidthMm, totalHeightMm)
+        val mapWidth = max(8, (totalWidthMm * pixelsPerMm).roundToInt())
+        val mapHeight = max(8, (totalHeightMm * pixelsPerMm).roundToInt())
+        val footprintWidth = max(1, (spec.widthMm * pixelsPerMm).roundToInt())
+        val footprintHeight = max(1, (spec.heightMm * pixelsPerMm).roundToInt())
+        val footprint = Bitmap.createScaledBitmap(topView, footprintWidth, footprintHeight, true)
+        val footprintPixels = IntArray(footprintWidth * footprintHeight)
+        footprint.getPixels(footprintPixels, 0, footprintWidth, 0, 0, footprintWidth, footprintHeight)
+        if (footprint !== topView) footprint.recycle()
+
+        val coverage = FloatArray(mapWidth * mapHeight)
+        val offsetX = (mapWidth - footprintWidth) / 2
+        val offsetY = (mapHeight - footprintHeight) / 2
+        for (row in 0 until footprintHeight) {
+            for (column in 0 until footprintWidth) {
+                val targetRow = row + offsetY
+                val targetColumn = column + offsetX
+                if (targetRow in 0 until mapHeight && targetColumn in 0 until mapWidth) {
+                    coverage[targetRow * mapWidth + targetColumn] = Color.alpha(footprintPixels[row * footprintWidth + column]) / 255f
+                }
+            }
+        }
+        val blurRadius = max(1, (blurMm * pixelsPerMm).roundToInt())
+        repeat(2) {
+            boxBlur(coverage, mapWidth, mapHeight, blurRadius, horizontal = true)
+            boxBlur(coverage, mapWidth, mapHeight, blurRadius, horizontal = false)
+        }
+        val pixels = IntArray(mapWidth * mapHeight) { pixelIndex ->
+            Color.argb((coverage[pixelIndex] * opacity * 255f).roundToInt().coerceIn(0, 255), 0, 0, 0)
+        }
+        val shadowMap = Bitmap.createBitmap(pixels, mapWidth, mapHeight, Bitmap.Config.ARGB_8888)
+        val texture = writer.addPngTexture(png(shadowMap))
+        val material = writer.addMaterial(
+            JSONObject()
+                .put("name", "shadow")
+                .put("alphaMode", "BLEND")
+                .put(
+                    "pbrMetallicRoughness", JSONObject()
+                        .put("baseColorFactor", numbers(0f, 0f, 0f, 1f))
+                        .put("baseColorTexture", JSONObject().put("index", texture))
+                )
+                .put("extensions", JSONObject().put("KHR_materials_unlit", JSONObject()))
+        )
+        writer.addMeshNode(
+            "shadow",
+            listOf(quad(totalWidthMm / 2000f, totalHeightMm / 2000f, 0.0004f, material, vertexColor = null))
+        )
+        return writer.build()
+    }
+
+    private fun boxBlur(values: FloatArray, width: Int, height: Int, radius: Int, horizontal: Boolean) {
+        val lineLength = if (horizontal) width else height
+        val lineCount = if (horizontal) height else width
+        val line = FloatArray(lineLength)
+        for (lineIndex in 0 until lineCount) {
+            for (position in 0 until lineLength) {
+                line[position] = values[if (horizontal) lineIndex * width + position else position * width + lineIndex]
+            }
+            var runningSum = 0f
+            for (position in -radius..radius) runningSum += line[position.coerceIn(0, lineLength - 1)]
+            for (position in 0 until lineLength) {
+                values[if (horizontal) lineIndex * width + position else position * width + lineIndex] = runningSum / (radius * 2 + 1)
+                runningSum += line[(position + radius + 1).coerceIn(0, lineLength - 1)] - line[(position - radius).coerceIn(0, lineLength - 1)]
+            }
+        }
     }
 
     fun build(spec: Spec, photo: Bitmap, variantLabel: String, lightState: LightState): ByteArray {
