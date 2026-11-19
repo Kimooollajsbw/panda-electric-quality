@@ -31,7 +31,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.google.android.filament.View as FilamentView
 import com.google.ar.core.Anchor
 import com.google.ar.core.Config
 import com.google.ar.core.DepthPoint
@@ -450,7 +449,6 @@ class ArActivity : AppCompatActivity() {
         sceneView.planeRenderer.isShadowReceiver = true
         sceneView.view.apply {
             setShadowingEnabled(true)
-            shadowType = FilamentView.ShadowType.PCF
             multiSampleAntiAliasingOptions = multiSampleAntiAliasingOptions.apply {
                 enabled = true
                 sampleCount = 4
